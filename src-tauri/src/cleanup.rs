@@ -109,8 +109,12 @@ fn cleanup_roots() -> Vec<ScanRoot> {
     if let Ok(temp) = env::var("TEMP") {
         add_root(&mut roots, "File sementara pengguna", PathBuf::from(temp));
     }
+    if let Ok(tmp) = env::var("TMP") {
+        add_root(&mut roots, "File sementara pengguna", PathBuf::from(tmp));
+    }
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let local = PathBuf::from(local);
+        add_root(&mut roots, "File sementara pengguna", local.join("Temp"));
         add_root(&mut roots, "Cache grafis DirectX", local.join("D3DSCache"));
         add_root(&mut roots, "Laporan crash", local.join("CrashDumps"));
         add_root(
@@ -488,5 +492,16 @@ mod tests {
             root.validation_root,
             PathBuf::from(r"C:\Users\demo\AppData\Local\Microsoft\Windows\Explorer")
         );
+    }
+
+    #[test]
+    fn temp_roots_delete_children_not_the_temp_folder() {
+        let root = safe_root(
+            "File sementara pengguna",
+            PathBuf::from(r"C:\Users\demo\AppData\Local\Temp"),
+        );
+        assert!(root.safe_to_delete);
+        assert!(matches!(root.mode, DeleteMode::Children));
+        assert_eq!(root.validation_root, root.path);
     }
 }

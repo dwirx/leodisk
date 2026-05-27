@@ -1,9 +1,13 @@
 import type { PropsWithChildren, ReactNode } from "react";
 
-export function formatBytes(bytes?: number): string {
-  if (bytes === undefined || Number.isNaN(bytes)) return "Tidak tersedia";
+function isUsableNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+export function formatBytes(bytes?: number | null): string {
+  if (!isUsableNumber(bytes)) return "Tidak tersedia";
   const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = bytes;
+  let size = Math.max(0, bytes);
   let unit = 0;
   while (size >= 1024 && unit < units.length - 1) {
     size /= 1024;
@@ -12,8 +16,13 @@ export function formatBytes(bytes?: number): string {
   return `${size >= 100 || unit === 0 ? size.toFixed(0) : size.toFixed(2)} ${units[unit]}`;
 }
 
-export function formatPercent(value?: number): string {
-  return value === undefined ? "Tidak tersedia" : `${value.toFixed(1)}%`;
+export function formatPercent(value?: number | null): string {
+  return isUsableNumber(value) ? `${value.toFixed(1)}%` : "Tidak tersedia";
+}
+
+export function percentOf(used?: number | null, total?: number | null): number | undefined {
+  if (!isUsableNumber(used) || !isUsableNumber(total) || total <= 0) return undefined;
+  return (used / total) * 100;
 }
 
 export function Panel({
@@ -45,12 +54,13 @@ export function ProgressBar({
   value,
   accent = "blue",
 }: {
-  value: number;
+  value?: number | null;
   accent?: "mint" | "blue" | "amber";
 }) {
+  const safeValue = isUsableNumber(value) ? value : 0;
   return (
     <div className="progress">
-      <span className={accent} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      <span className={accent} style={{ width: `${Math.min(100, Math.max(0, safeValue))}%` }} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-export type Tab = "clean" | "apps" | "optimize" | "analyze" | "status";
+export type Tab = "clean" | "apps" | "optimize" | "analyze" | "performance" | "status";
 
 export interface ApiError {
   code: string;
@@ -35,12 +35,12 @@ export interface SystemSnapshot {
   memoryTotal: number;
   diskUsed: number;
   diskTotal: number;
-  diskReadPerSec?: number;
-  diskWritePerSec?: number;
+  diskReadPerSec?: number | null;
+  diskWritePerSec?: number | null;
   networkDownPerSec: number;
   networkUpPerSec: number;
-  gpuPercent?: number;
-  battery?: BatteryMetric;
+  gpuPercent?: number | null;
+  battery?: BatteryMetric | null;
   uptimeSeconds: number;
   processes: ProcessMetric[];
 }

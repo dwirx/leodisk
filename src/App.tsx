@@ -10,6 +10,7 @@ import {
   formatBytes,
   formatPercent,
   Panel,
+  percentOf,
   ProgressBar,
   Sparkline,
   Toast,
@@ -34,6 +35,7 @@ const tabs: Array<{ id: Tab; label: string }> = [
   { id: "apps", label: "Aplikasi" },
   { id: "optimize", label: "Optimalkan" },
   { id: "analyze", label: "Analisis" },
+  { id: "performance", label: "Performa" },
   { id: "status", label: "Status" },
 ];
 
@@ -111,13 +113,7 @@ function treemapLayout(folders: DiskScanResult["folders"]) {
   });
 }
 
-function StatusPage({
-  active,
-  latestCleanup,
-}: {
-  active: boolean;
-  latestCleanup?: CleanupReport;
-}) {
+function useSystemSnapshot(active: boolean) {
   const [snapshot, setSnapshot] = useState<SystemSnapshot>();
   const [cpuHistory, setCpuHistory] = useState<number[]>([]);
   const [networkHistory, setNetworkHistory] = useState<number[]>([]);
@@ -132,8 +128,8 @@ function StatusPage({
         if (!mounted) return;
         setSnapshot(data);
         setError(undefined);
-        setCpuHistory((history) => [...history.slice(-25), data.cpuPercent]);
-        setNetworkHistory((history) => [...history.slice(-25), data.networkDownPerSec]);
+        setCpuHistory((history) => [...history.slice(-25), data.cpuPercent ?? 0]);
+        setNetworkHistory((history) => [...history.slice(-25), data.networkDownPerSec ?? 0]);
       } catch (requestError) {
         if (mounted) setError(messageOf(requestError));
       }
@@ -145,6 +141,20 @@ function StatusPage({
       window.clearInterval(timer);
     };
   }, [active]);
+
+  return { snapshot, cpuHistory, networkHistory, error };
+}
+
+function StatusPage({
+  active,
+  latestCleanup,
+}: {
+  active: boolean;
+  latestCleanup?: CleanupReport;
+}) {
+  const { snapshot, cpuHistory, networkHistory, error } = useSystemSnapshot(active);
+  const memoryPercent = percentOf(snapshot?.memoryUsed, snapshot?.memoryTotal);
+  const diskPercent = percentOf(snapshot?.diskUsed, snapshot?.diskTotal);
 
   const health = latestCleanup
     ? latestCleanup.totalBytes === 0
@@ -176,11 +186,8 @@ function StatusPage({
           <p className="muted">Pemakaian prosesor saat ini</p>
         </Panel>
         <Panel title="MEMORI" accent="amber">
-          <div className="metric">{snapshot ? formatPercent((snapshot.memoryUsed / snapshot.memoryTotal) * 100) : "--"}</div>
-          <ProgressBar
-            value={snapshot ? (snapshot.memoryUsed / snapshot.memoryTotal) * 100 : 0}
-            accent="amber"
-          />
+          <div className="metric">{snapshot ? formatPercent(memoryPercent) : "--"}</div>
+          <ProgressBar value={memoryPercent} accent="amber" />
           <p className="muted">
             {snapshot ? `${formatBytes(snapshot.memoryUsed)} / ${formatBytes(snapshot.memoryTotal)}` : "Memuat..."}
           </p>
@@ -188,17 +195,14 @@ function StatusPage({
         <Panel title="GPU" accent="amber">
           <div className="metric">{formatPercent(snapshot?.gpuPercent)}</div>
           <p className="muted">
-            {snapshot?.gpuPercent === undefined
+            {snapshot?.gpuPercent == null
               ? "Counter GPU tidak tersedia"
               : "Utilisasi GPU Windows"}
           </p>
         </Panel>
         <Panel title="DISK" accent="blue" className="wide-card">
           <div className="metric">{snapshot ? formatBytes(snapshot.diskTotal - snapshot.diskUsed) : "--"} <small>tersedia</small></div>
-          <ProgressBar
-            value={snapshot ? (snapshot.diskUsed / snapshot.diskTotal) * 100 : 0}
-            accent="blue"
-          />
+          <ProgressBar value={diskPercent} accent="blue" />
           <p className="muted">
             {snapshot
               ? `${formatBytes(snapshot.diskUsed)} terpakai - baca ${formatBytes(snapshot.diskReadPerSec)}/s - tulis ${formatBytes(snapshot.diskWritePerSec)}/s`
@@ -242,6 +246,103 @@ function StatusPage({
         {!snapshot && <EmptyState>Menunggu snapshot sistem...</EmptyState>}
       </Panel>
     </>
+  );
+}
+
+function PerformancePage({ active }: { active: boolean }) {
+  const { snapshot, cpuHistory, networkHistory, error } = useSystemSnapshot(active);
+  const memoryPercent = percentOf(snapshot?.memoryUsed, snapshot?.memoryTotal);
+  const diskPercent = percentOf(snapshot?.diskUsed, snapshot?.diskTotal);
+  const availableDisk = snapshot ? snapshot.diskTotal - snapshot.diskUsed : undefined;
+  const alerts = [
+    snapshot && snapshot.cpuPercent >= 85 ? "CPU sedang tinggi" : undefined,
+    memoryPercent !== undefined && memoryPercent >= 85 ? "Memori hampir penuh" : undefined,
+    diskPercent !== undefined && diskPercent >= 90 ? "Disk hampir penuh" : undefined,
+    snapshot?.diskReadPerSec == null && snapshot?.diskWritePerSec == null ? "Counter I/O disk tidak tersedia" : undefined,
+  ].filter((alert): alert is string => Boolean(alert));
+
+  return (
+    <div className="feature-page performance-page">
+      <div className="page-title">
+        <div>
+          <h1>Analisis performa</h1>
+          <p>Pantau pemakaian sistem real-time sebelum menjalankan scan atau pembersihan besar.</p>
+        </div>
+        <span className="tag blue">{snapshot ? snapshot.computerName : "Memuat"}</span>
+      </div>
+      <ErrorBanner message={error} />
+      <div className="summary-cards">
+        <Panel title="CPU" accent="mint" tag={formatPercent(snapshot?.cpuPercent)}>
+          <div className="metric">{formatPercent(snapshot?.cpuPercent)}</div>
+          <Sparkline values={cpuHistory} />
+        </Panel>
+        <Panel title="MEMORI" accent="amber" tag={formatPercent(memoryPercent)}>
+          <div className="metric">{formatBytes(snapshot?.memoryUsed)}</div>
+          <ProgressBar value={memoryPercent} accent="amber" />
+          <p className="muted">Total {formatBytes(snapshot?.memoryTotal)}</p>
+        </Panel>
+        <Panel title="DISK" accent="blue" tag={`${formatBytes(availableDisk)} kosong`}>
+          <div className="metric">{formatPercent(diskPercent)}</div>
+          <ProgressBar value={diskPercent} accent="blue" />
+          <p className="muted">
+            baca {formatBytes(snapshot?.diskReadPerSec)}/s - tulis {formatBytes(snapshot?.diskWritePerSec)}/s
+          </p>
+        </Panel>
+      </div>
+      <div className="summary-cards">
+        <Panel title="JARINGAN" accent="blue">
+          <div className="metric">{formatBytes(snapshot?.networkDownPerSec)}<small>/s</small></div>
+          <Sparkline values={networkHistory} accent="blue" />
+          <p className="muted">naik {formatBytes(snapshot?.networkUpPerSec)}/s</p>
+        </Panel>
+        <Panel title="GPU" accent="amber">
+          <div className="metric">{formatPercent(snapshot?.gpuPercent)}</div>
+          <p className="muted">{snapshot?.gpuPercent == null ? "Counter GPU tidak tersedia" : "Utilisasi GPU Windows"}</p>
+        </Panel>
+        <Panel title="BATERAI" accent="mint">
+          {snapshot?.battery ? (
+            <>
+              <div className="metric">{snapshot.battery.percent}%</div>
+              <ProgressBar value={snapshot.battery.percent} accent="mint" />
+              <p className="muted">{snapshot.battery.charging ? "Sedang mengisi daya" : "Menggunakan baterai"}</p>
+            </>
+          ) : (
+            <EmptyState>Tidak ada baterai terdeteksi</EmptyState>
+          )}
+        </Panel>
+      </div>
+      <Panel title="INDIKATOR MASALAH" accent={alerts.length ? "amber" : "mint"} tag={`${alerts.length} catatan`}>
+        {alerts.length ? (
+          <div className="category-grid">
+            {alerts.map((alert) => (
+              <div className="category-card amber" key={alert}>
+                <span>{alert}</span>
+                <small>Periksa proses dan kapasitas sebelum menjalankan tugas berat.</small>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState>Tidak ada indikator performa yang perlu perhatian.</EmptyState>
+        )}
+      </Panel>
+      <Panel className="process-panel" title="PROSES TERATAS" accent="blue">
+        <div className="table-head process-row">
+          <span>NAMA PROSES</span>
+          <span>PID</span>
+          <span>CPU</span>
+          <span>MEMORI</span>
+        </div>
+        {snapshot?.processes.map((process) => (
+          <div className="process-row" key={process.pid}>
+            <strong>{process.name}</strong>
+            <span className="mono">{process.pid}</span>
+            <span className="mono">{formatPercent(process.cpuPercent)}</span>
+            <span className="mono">{formatBytes(process.memoryBytes)}</span>
+          </div>
+        ))}
+        {!snapshot && <EmptyState>Menunggu snapshot sistem...</EmptyState>}
+      </Panel>
+    </div>
   );
 }
 
@@ -667,7 +768,21 @@ function OptimizePage({ active, notify }: { active: boolean; notify: (message: s
   );
 }
 
-function AnalyzePage({ active, notify }: { active: boolean; notify: (message: string) => void }) {
+type ScanStatus = {
+  job?: ScanJob;
+  progress?: DiskScanProgress;
+  error?: string;
+};
+
+function AnalyzePage({
+  active,
+  notify,
+  onScanStatus,
+}: {
+  active: boolean;
+  notify: (message: string) => void;
+  onScanStatus: (status: ScanStatus) => void;
+}) {
   const [volumes, setVolumes] = useState<StorageVolume[]>([]);
   const [loadingVolumes, setLoadingVolumes] = useState(false);
   const [listenersReady, setListenersReady] = useState(false);
@@ -686,6 +801,10 @@ function AnalyzePage({ active, notify }: { active: boolean; notify: (message: st
   const readPendingResult = () => pendingResult.current;
   const readPendingError = () => pendingError.current;
   const readPendingProgress = () => pendingProgress.current;
+
+  useEffect(() => {
+    onScanStatus({ job, progress, error });
+  }, [job, progress, error, onScanStatus]);
 
   const completeScan = (payload: DiskScanResult) => {
     setResult(payload);
@@ -718,7 +837,6 @@ function AnalyzePage({ active, notify }: { active: boolean; notify: (message: st
   }, [active]);
 
   useEffect(() => {
-    if (!active) return;
     let mounted = true;
     setListenersReady(false);
     const handlers = Promise.all([
@@ -752,10 +870,22 @@ function AnalyzePage({ active, notify }: { active: boolean; notify: (message: st
       setListenersReady(false);
       void handlers.then((unlisteners) => unlisteners.forEach((unlisten) => unlisten()));
     };
-  }, [active]);
+    void invoke<ScanJob | null>("get_active_disk_scan")
+      .then((activeScan) => {
+        if (!mounted || !activeScan || typeof activeScan.jobId !== "string" || typeof activeScan.root !== "string") return;
+        activeJobId.current = activeScan.jobId;
+        setJob(activeScan);
+        setError("Pemindaian masih berjalan di background. Tunggu selesai atau batalkan.");
+      })
+      .catch(() => {});
+  }, []);
 
   const start = async (root: string) => {
-    if (job || startingScan || !listenersReady) return;
+    if (job) {
+      setError("Pemindaian masih berjalan di background. Tunggu selesai atau batalkan.");
+      return;
+    }
+    if (startingScan || !listenersReady) return;
     setError(undefined);
     setStartingScan(true);
     acceptingStartEvents.current = true;
@@ -1007,10 +1137,20 @@ function App() {
   const [tab, setTab] = useState<Tab>("status");
   const [latestCleanup, setLatestCleanup] = useState<CleanupReport>();
   const [toast, setToast] = useState<string>();
+  const [scanStatus, setScanStatus] = useState<ScanStatus>({});
   const currentLabel = useMemo(() => tabs.find((item) => item.id === tab)?.label, [tab]);
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(undefined), 4000);
+  };
+  const cancelActiveScan = async () => {
+    if (!scanStatus.job) return;
+    try {
+      const report = await invoke<ActionReport>("cancel_disk_scan", { jobId: scanStatus.job.jobId });
+      notify(report.message);
+    } catch (cancelError) {
+      notify(messageOf(cancelError));
+    }
   };
 
   return (
@@ -1029,14 +1169,26 @@ function App() {
               </button>
             ))}
           </nav>
-          <span className="current-tab">{currentLabel}</span>
+          <div className="topbar-status">
+            <span className="current-tab">{currentLabel}</span>
+            {scanStatus.job && (
+              <div className="scan-chip" role="status">
+                <button className="text-action" onClick={() => setTab("analyze")}>Scan: {scanStatus.job.root}</button>
+                <span>{scanStatus.progress?.filesScanned ?? 0} file</span>
+                <button className="text-action" onClick={() => void cancelActiveScan()}>Batalkan</button>
+              </div>
+            )}
+          </div>
         </header>
         <div className="workspace">
           {tab === "status" && <StatusPage active latestCleanup={latestCleanup} />}
           {tab === "clean" && <CleanPage onReport={setLatestCleanup} notify={notify} />}
           {tab === "apps" && <AppsPage active notify={notify} />}
           {tab === "optimize" && <OptimizePage active notify={notify} />}
-          {tab === "analyze" && <AnalyzePage active notify={notify} />}
+          {tab === "performance" && <PerformancePage active />}
+          <div hidden={tab !== "analyze"}>
+            <AnalyzePage active={tab === "analyze"} notify={notify} onScanStatus={setScanStatus} />
+          </div>
         </div>
         {toast && <Toast message={toast} onClose={() => setToast(undefined)} />}
       </main>

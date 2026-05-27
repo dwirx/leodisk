@@ -29,6 +29,7 @@ pub fn run() {
             startup::open_startup_settings,
             storage::list_storage_volumes,
             storage::open_storage_settings,
+            disk_scan::get_active_disk_scan,
             disk_scan::start_disk_scan,
             disk_scan::cancel_disk_scan
         ])

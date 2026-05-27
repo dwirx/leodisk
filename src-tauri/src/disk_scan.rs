@@ -410,6 +410,7 @@ fn scan(
     deletion_items: Arc<Mutex<HashMap<String, TrackedDeletion>>>,
     known_locations: Arc<Mutex<HashMap<String, PathBuf>>>,
     disk_jobs: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+    active_disk_scan: Arc<Mutex<Option<ScanJob>>>,
 ) {
     let entries = match read_native_entries(&root) {
         Ok(entries) => entries,
@@ -424,6 +425,9 @@ fn scan(
             );
             if let Ok(mut jobs) = disk_jobs.lock() {
                 jobs.remove(&job_id);
+            }
+            if let Ok(mut active) = active_disk_scan.lock() {
+                *active = None;
             }
             return;
         }
@@ -462,6 +466,9 @@ fn scan(
         );
         if let Ok(mut jobs) = disk_jobs.lock() {
             jobs.remove(&job_id);
+        }
+        if let Ok(mut active) = active_disk_scan.lock() {
+            *active = None;
         }
         return;
     }
@@ -584,6 +591,9 @@ fn scan(
     if let Ok(mut jobs) = disk_jobs.lock() {
         jobs.remove(&job_id);
     }
+    if let Ok(mut active) = active_disk_scan.lock() {
+        *active = None;
+    }
 }
 
 #[tauri::command]
@@ -623,9 +633,15 @@ pub fn start_disk_scan(
         job_id: job_id.clone(),
         root: path_display(&root),
     };
+    *state
+        .active_disk_scan
+        .lock()
+        .map_err(|_| ApiError::new("SCAN_LOCK", "Status pemindaian tidak dapat disimpan."))? =
+        Some(result.clone());
     let deletion_items = state.deletion_items.clone();
     let known_locations = state.known_locations.clone();
     let disk_jobs = state.disk_jobs.clone();
+    let active_disk_scan = state.active_disk_scan.clone();
     std::thread::spawn(move || {
         scan(
             job_id,
@@ -635,9 +651,23 @@ pub fn start_disk_scan(
             deletion_items,
             known_locations,
             disk_jobs,
+            active_disk_scan,
         );
     });
     Ok(result)
+}
+
+fn active_disk_scan(state: &AppState) -> ApiResult<Option<ScanJob>> {
+    state
+        .active_disk_scan
+        .lock()
+        .map(|active| active.clone())
+        .map_err(|_| ApiError::new("SCAN_LOCK", "Status pemindaian tidak tersedia."))
+}
+
+#[tauri::command]
+pub fn get_active_disk_scan(state: tauri::State<'_, AppState>) -> ApiResult<Option<ScanJob>> {
+    active_disk_scan(&state)
 }
 
 #[tauri::command]
@@ -686,5 +716,18 @@ mod tests {
         assert_eq!(worker_count_for(DiskKind::SSD, false, false), 4);
         assert_eq!(worker_count_for(DiskKind::HDD, false, false), 1);
         assert_eq!(worker_count_for(DiskKind::SSD, true, false), 1);
+    }
+
+    #[test]
+    fn active_scan_status_returns_current_job() {
+        let state = AppState::default();
+        assert!(active_disk_scan(&state).unwrap().is_none());
+        *state.active_disk_scan.lock().unwrap() = Some(ScanJob {
+            job_id: "job-1".into(),
+            root: r"C:\".into(),
+        });
+        let active = active_disk_scan(&state).unwrap().expect("active job");
+        assert_eq!(active.job_id, "job-1");
+        assert_eq!(active.root, r"C:\");
     }
 }

@@ -4,6 +4,7 @@ use std::{
     sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
+use crate::models::ScanJob;
 use crate::system::MonitorState;
 
 #[derive(Debug, Clone, Copy)]
@@ -25,6 +26,7 @@ pub struct AppState {
     pub deletion_items: Arc<Mutex<HashMap<String, TrackedDeletion>>>,
     pub known_locations: Arc<Mutex<HashMap<String, PathBuf>>>,
     pub disk_jobs: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
+    pub active_disk_scan: Arc<Mutex<Option<ScanJob>>>,
 }
 
 impl Default for AppState {
@@ -34,6 +36,7 @@ impl Default for AppState {
             deletion_items: Arc::new(Mutex::new(HashMap::new())),
             known_locations: Arc::new(Mutex::new(HashMap::new())),
             disk_jobs: Arc::new(Mutex::new(HashMap::new())),
+            active_disk_scan: Arc::new(Mutex::new(None)),
         }
     }
 }
