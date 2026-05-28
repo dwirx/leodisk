@@ -57,13 +57,17 @@ export interface CleanupItem {
   skippedCount: number;
   safeToDelete: boolean;
   riskLevel?: "low" | "medium" | "high";
-  decision?: "clean" | "review" | "manual" | "advisory";
-  status?: "ready" | "review" | "manual" | "notFound" | "blocked";
+  decision?: "clean" | "review" | "manual" | "advisory" | "admin";
+  status?: "ready" | "review" | "manual" | "advisory" | "admin" | "notFound" | "blocked";
   priority?: number;
   icon?: string;
   safetyLabel: string;
   safetyNote: string;
   recommendation?: string;
+  scope?: string;
+  detectedBy?: string;
+  detailTags?: string[];
+  confidenceLabel?: string;
   advisory?: boolean;
   checked?: boolean;
   exists?: boolean;
@@ -86,6 +90,8 @@ export interface CleanupReportSummary {
   reviewItems: number;
   manualBytes: number;
   manualItems: number;
+  adminBytes: number;
+  adminItems: number;
   advisoryBytes: number;
   advisoryItems: number;
 }

@@ -539,6 +539,7 @@ fn scan(
                         mode: DeleteMode::SelfItem,
                         estimated_bytes: size,
                         clean_allowed: true,
+                        decision: "clean".into(),
                     },
                 ));
             }

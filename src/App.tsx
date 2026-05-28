@@ -1,9 +1,69 @@
 import { Component, useEffect, useMemo, useRef, useState } from "react";
-import type { ErrorInfo, ReactNode } from "react";
+import type { CSSProperties, ErrorInfo, ReactNode } from "react";
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  horizontalListSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
+import {
+  Activity,
+  AppWindow,
+  Archive,
+  BarChart3,
+  Check,
+  ChevronUp,
+  Clipboard,
+  Database,
+  Download,
+  Eraser,
+  FileArchive,
+  FileSearch,
+  FolderOpen,
+  Info,
+  Gauge,
+  LayoutDashboard,
+  Loader2,
+  MonitorCog,
+  PackageOpen,
+  PieChart as PieIcon,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   ConfirmDialog,
   EmptyState,
@@ -33,15 +93,37 @@ import type {
 } from "./types";
 import "./App.css";
 
-const tabs: Array<{ id: Tab; label: string; icon: string }> = [
-  { id: "clean", label: "Bersihkan", icon: "CL" },
-  { id: "purge", label: "Purge", icon: "PG" },
-  { id: "apps", label: "Aplikasi", icon: "AP" },
-  { id: "optimize", label: "Optimalkan", icon: "OP" },
-  { id: "analyze", label: "Analisis", icon: "AN" },
-  { id: "performance", label: "Performa", icon: "PF" },
-  { id: "status", label: "Status", icon: "ST" },
+type TabConfig = { id: Tab; label: string; icon: LucideIcon };
+type AnalyzerTab = { id: string; label: string; icon: LucideIcon };
+
+const defaultTabs: TabConfig[] = [
+  { id: "clean", label: "Bersihkan", icon: Sparkles },
+  { id: "purge", label: "Purge", icon: Eraser },
+  { id: "apps", label: "Aplikasi", icon: AppWindow },
+  { id: "optimize", label: "Optimalkan", icon: MonitorCog },
+  { id: "analyze", label: "Analisis", icon: BarChart3 },
+  { id: "performance", label: "Performa", icon: Gauge },
+  { id: "status", label: "Status", icon: LayoutDashboard },
 ];
+
+const defaultAnalyzerTabs: AnalyzerTab[] = [
+  { id: "report", label: "Laporan", icon: FileSearch },
+  { id: "network", label: "Network Graph", icon: Activity },
+  { id: "treemap", label: "Treemap", icon: PieIcon },
+  { id: "files", label: "Largest Files", icon: FileArchive },
+  { id: "folders", label: "Largest Folders", icon: FolderOpen },
+  { id: "review", label: "Review Queue", icon: ShieldAlert },
+  { id: "deep", label: "Deep Cleaner", icon: Sparkles },
+  { id: "uninstaller", label: "Uninstaller", icon: PackageOpen },
+  { id: "performance", label: "Performance", icon: Gauge },
+  { id: "pinned", label: "Pinned (0)", icon: Check },
+  { id: "browser", label: "Browser/App", icon: AppWindow },
+  { id: "history", label: "History", icon: Archive },
+];
+
+const CHART_COLORS = ["#4bc49c", "#579be6", "#e8af62", "#dc7763", "#b8a989", "#8dd5f7"];
+const ADMIN_CONFIRMATION_PHRASE = "SAYA MENGERTI";
+type CleanupDecision = NonNullable<CleanupItem["decision"]>;
 
 function messageOf(error: unknown): string {
   if (typeof error === "string" && error.trim()) {
@@ -399,16 +481,18 @@ function cleanupSummary(report: CleanupReport) {
     totalJunkBytes: report.totalBytes,
     cleanableBytes: report.items.filter((item) => item.safeToDelete).reduce((sum, item) => sum + item.sizeBytes, 0),
     cleanableItems: report.items.filter((item) => item.safeToDelete).length,
-    reviewBytes: report.items.filter((item) => !item.safeToDelete).reduce((sum, item) => sum + item.sizeBytes, 0),
-    reviewItems: report.items.filter((item) => !item.safeToDelete).length,
-    manualBytes: 0,
-    manualItems: 0,
+    reviewBytes: report.items.filter((item) => decisionOf(item) === "review").reduce((sum, item) => sum + item.sizeBytes, 0),
+    reviewItems: report.items.filter((item) => decisionOf(item) === "review").length,
+    manualBytes: report.items.filter((item) => decisionOf(item) === "manual").reduce((sum, item) => sum + item.sizeBytes, 0),
+    manualItems: report.items.filter((item) => decisionOf(item) === "manual").length,
+    adminBytes: report.items.filter((item) => decisionOf(item) === "admin").reduce((sum, item) => sum + item.sizeBytes, 0),
+    adminItems: report.items.filter((item) => decisionOf(item) === "admin").length,
     advisoryBytes: report.advisories?.reduce((sum, item) => sum + item.sizeBytes, 0) ?? 0,
     advisoryItems: report.advisories?.length ?? 0,
   };
 }
 
-function decisionOf(item: CleanupItem) {
+function decisionOf(item: CleanupItem): CleanupDecision {
   return item.decision ?? (item.safeToDelete ? "clean" : "review");
 }
 
@@ -419,6 +503,7 @@ function riskLabel(value?: string) {
 }
 
 function decisionLabel(value?: string) {
+  if (value === "admin") return "Admin Clean";
   if (value === "manual") return "Manual Saja";
   if (value === "review") return "Review Dulu";
   if (value === "advisory") return "Advisory";
@@ -436,19 +521,371 @@ function cleanupIconCode(item: CleanupItem) {
   if (source.includes("gpu") || source.includes("shader") || source.includes("nvidia") || source.includes("amd")) return "GP";
   if (source.includes("trash") || source.includes("recycle")) return "TR";
   if (source.includes("app") || source.includes("discord") || source.includes("slack")) return "AP";
+  if (source.includes("admin") || source.includes("protected") || source.includes("system")) return "AD";
   if (source.includes("manual") || source.includes("installer")) return "MN";
   if (source.includes("advisory") || source.includes("memory") || source.includes("power")) return "AD";
   return (item.category || "IT").slice(0, 2).toUpperCase();
 }
 
-function ButtonIcon({ code }: { code: string }) {
-  return <span className="button-icon" aria-hidden="true">{code}</span>;
+function cleanupExplanation(item: CleanupItem) {
+  const source = `${item.name ?? ""} ${item.category} ${item.path}`.toLowerCase();
+  if (source.includes("windows temp") || source.includes("\\windows\\temp")) {
+    return "File sementara milik sistem Windows. Dibuat saat proses instalasi, update, atau error sistem. Salah satu tersangka klasik yang sering diabaikan.";
+  }
+  if (source.includes("browser") || source.includes("chrome") || source.includes("edge") || source.includes("firefox")) {
+    return "Cache browser mempercepat halaman yang sering dibuka, tetapi bisa membesar setelah update, crash, atau pemakaian lama.";
+  }
+  if (source.includes("npm") || source.includes("yarn") || source.includes("pnpm") || source.includes("bun") || source.includes("cargo") || source.includes("gradle")) {
+    return "Cache dependency developer dapat dibuat ulang oleh package manager. Ukurannya sering besar karena menyimpan banyak versi paket dan artefak build.";
+  }
+  if (source.includes("shader") || source.includes("gpu") || source.includes("nvidia") || source.includes("amd")) {
+    return "Cache shader/GPU membantu aplikasi dan game membuka render lebih cepat. File ini bisa dibuat ulang setelah cleanup.";
+  }
+  if (decisionOf(item) === "advisory") {
+    return "Temuan ini menjelaskan penyebab ruang disk terpakai, tetapi tidak dimasukkan ke pembersihan otomatis karena berada di area sistem atau data pribadi.";
+  }
+  return item.recommendation || item.safetyNote || "Item ditemukan dari daftar lokasi cleanup yang dikenal dan sudah diberi label keputusan berdasarkan tingkat risikonya.";
+}
+
+function cleaningMethod(item: CleanupItem) {
+  const source = `${item.name ?? ""} ${item.category} ${item.path}`.toLowerCase();
+  if (source.includes("\\windows\\temp") || source.includes("windows temp")) return "Disk Cleanup > Temporary files";
+  if (source.includes("browser") || source.includes("chrome") || source.includes("edge") || source.includes("firefox")) return "Tutup browser > bersihkan dari LeoDisk atau pengaturan browser";
+  if (decisionOf(item) === "clean") return "Tambahkan ke Batch Clean";
+  if (decisionOf(item) === "admin") return `Review folder > Izinkan Admin Clean > ketik ${ADMIN_CONFIRMATION_PHRASE}`;
+  if (decisionOf(item) === "manual") return "Buka lokasi > review manual";
+  if (decisionOf(item) === "advisory") return "Audit ukuran > gunakan Settings/alat resmi Windows";
+  return "Buka folder > pastikan tidak dipakai > review manual";
+}
+
+function preflightStatus(item: CleanupItem) {
+  const decision = decisionOf(item);
+  if (item.skippedCount > 0) return "Sebagian Terbatas";
+  if (decision === "clean") return "Lolos";
+  if (decision === "admin") return "Butuh Konfirmasi";
+  if (decision === "advisory") return "Audit Saja";
+  return "Butuh Review";
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function ButtonIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <Icon className="button-icon" aria-hidden="true" size={16} strokeWidth={2.2} />;
+}
+
+function TabIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return <Icon className="nav-icon" aria-hidden="true" size={17} strokeWidth={2.3} />;
+}
+
+function SortableTabButton({
+  id,
+  active,
+  icon,
+  label,
+  onClick,
+  className = "",
+}: {
+  id: string;
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  className?: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      className={`${active ? "active" : ""} ${isDragging ? "dragging" : ""} ${className}`}
+      onClick={onClick}
+      {...attributes}
+      {...listeners}
+    >
+      <TabIcon icon={icon} />
+      {label}
+    </button>
+  );
+}
+
+function useSortableSensors() {
+  return useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 }
 
 function statusText(report: CleanupReport) {
   const summary = cleanupSummary(report);
   const level = summary.totalJunkBytes >= 10 * 1024 * 1024 * 1024 ? "Kritis" : summary.totalJunkBytes ? "Perlu Perhatian" : "Bersih";
   return `${level}. ${formatBytes(summary.totalJunkBytes)} junk ditemukan dan ${formatBytes(summary.cleanableBytes)} siap dibersihkan sekarang.`;
+}
+
+function decisionChartData(items: CleanupItem[]) {
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    totals.set(decisionLabel(decisionOf(item)), (totals.get(decisionLabel(decisionOf(item))) ?? 0) + item.sizeBytes);
+  }
+  return [...totals.entries()].map(([name, value]) => ({ name, value }));
+}
+
+function riskChartData(items: CleanupItem[]) {
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    const risk = riskLabel(item.riskLevel);
+    totals.set(risk, (totals.get(risk) ?? 0) + item.sizeBytes);
+  }
+  return [...totals.entries()].map(([name, value]) => ({ name, value }));
+}
+
+function categoryChartData(report: CleanupReport) {
+  return (report.categoryTotals ?? [])
+    .map((item) => ({
+      name: item.category,
+      group: item.group,
+      value: item.sizeBytes,
+      files: item.fileCount,
+      items: item.itemCount,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+}
+
+function ByteTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value?: number; payload?: Record<string, unknown> }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const value = payload[0]?.value ?? 0;
+  const detail = payload[0]?.payload;
+  return (
+    <div className="chart-tooltip">
+      <strong>{label ?? String(detail?.name ?? "")}</strong>
+      <span>{formatBytes(value)}</span>
+      {typeof detail?.files === "number" && <small>{detail.files} file</small>}
+      {typeof detail?.items === "number" && <small>{detail.items} item</small>}
+    </div>
+  );
+}
+
+function CleanupCharts({
+  report,
+  selectedCategory,
+  onSelectCategory,
+}: {
+  report: CleanupReport;
+  selectedCategory: string;
+  onSelectCategory: (category: string) => void;
+}) {
+  const allItems = [...report.items, ...(report.advisories ?? [])];
+  const categories = categoryChartData(report);
+  const decisions = decisionChartData(allItems);
+  const risks = riskChartData(allItems);
+  return (
+    <div className="chart-grid cleanup-charts">
+      <Panel title="GRAFIK KATEGORI" accent="blue" tag={selectedCategory || "Semua"}>
+        <div className="chart-box">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={categories} margin={{ top: 6, right: 8, bottom: 36, left: 4 }}>
+              <CartesianGrid stroke="rgba(236,222,190,0.1)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: "#b7afa2", fontSize: 11 }} interval={0} angle={-22} textAnchor="end" height={50} />
+              <YAxis tick={{ fill: "#b7afa2", fontSize: 11 }} tickFormatter={(value) => formatBytes(Number(value)).replace(" ", "")} width={58} />
+              <Tooltip content={<ByteTooltip />} />
+              <Bar dataKey="value" radius={[7, 7, 2, 2]} onClick={(data) => onSelectCategory(String(data.name ?? ""))}>
+                {categories.map((entry, index) => (
+                  <Cell key={entry.name} fill={entry.name === selectedCategory ? "#f2ede4" : CHART_COLORS[index % CHART_COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Panel>
+      <Panel title="KEPUTUSAN" accent="mint">
+        <div className="chart-box compact-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={decisions} dataKey="value" nameKey="name" innerRadius={48} outerRadius={82} paddingAngle={3}>
+                {decisions.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+              </Pie>
+              <Tooltip content={<ByteTooltip />} />
+              <Legend wrapperStyle={{ color: "#b7afa2", fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </Panel>
+      <Panel title="RISIKO" accent="amber">
+        <div className="chart-box compact-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={risks} dataKey="value" nameKey="name" innerRadius={46} outerRadius={80} paddingAngle={3}>
+                {risks.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />)}
+              </Pie>
+              <Tooltip content={<ByteTooltip />} />
+              <Legend wrapperStyle={{ color: "#b7afa2", fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+function CleanupEvidenceCard({
+  item,
+  selectable,
+  adminApproved,
+  onApproveAdmin,
+  onOpen,
+  onCopy,
+}: {
+  item: CleanupItem;
+  selectable: boolean;
+  adminApproved?: boolean;
+  onApproveAdmin?: () => void;
+  onOpen: () => void;
+  onCopy: (value: string) => void;
+}) {
+  const decision = decisionOf(item);
+  const isAdmin = decision === "admin";
+  const method = cleaningMethod(item);
+  const evidence = [
+    ["Path", item.exists === false ? "Tidak ditemukan" : "Ditemukan"],
+    ["Akses", item.skippedCount ? "Sebagian Terbatas" : "Bisa Dibaca"],
+    ["Tipe", item.kind === "file" ? "File" : "Direktori"],
+    ["Preflight", preflightStatus(item)],
+    ["Estimasi", formatBytes(item.sizeBytes)],
+    ["Skip", String(item.skippedCount)],
+  ];
+  return (
+    <div className="cleanup-row-detail scan-detail-card">
+      <section className="scan-detail-section location">
+        <h3><FolderOpen size={14} aria-hidden="true" /> Lokasi</h3>
+        <code>{item.path}</code>
+        <div className="detail-actions">
+          <button className="button ghost compact" onClick={onOpen}><ButtonIcon icon={FolderOpen} />Buka Folder</button>
+          <button className="button ghost compact" onClick={() => onCopy(item.path)}><ButtonIcon icon={Clipboard} />Salin</button>
+        </div>
+      </section>
+      <section className="scan-detail-section">
+        <h3><Info size={14} aria-hidden="true" /> Penjelasan</h3>
+        <p>{cleanupExplanation(item)}</p>
+      </section>
+      <section className="scan-detail-section">
+        <h3><ShieldCheck size={14} aria-hidden="true" /> Keputusan Cleaner</h3>
+        <p>{item.safetyNote || item.recommendation}</p>
+        <div className="detail-badges">
+          <span className={`mini-badge ${decision}`}>{decisionLabel(decision)}</span>
+          <span className={`mini-badge risk-${item.riskLevel ?? "low"}`}>{riskLabel(item.riskLevel)}</span>
+        </div>
+      </section>
+      <section className="scan-detail-section">
+        <h3><ShieldAlert size={14} aria-hidden="true" /> Catatan Keamanan</h3>
+        <p>{item.safetyLabel}. {isAdmin ? `Item admin tidak dipilih otomatis. Aktifkan hanya jika Anda siap mengetik ${ADMIN_CONFIRMATION_PHRASE} pada dialog hapus.` : selectable ? "Windows atau aplikasi akan membuat ulang jika diperlukan. File yang sedang dipakai akan dilewati." : "Item ini tidak dipilih otomatis. Review isi dan konteksnya sebelum tindakan manual."}</p>
+      </section>
+      <section className="scan-detail-section evidence">
+        <h3><FileSearch size={14} aria-hidden="true" /> Preflight Evidence</h3>
+        <div className="evidence-grid">
+          {evidence.map(([label, value]) => (
+            <span key={label}>
+              <small>{label}</small>
+              <strong>{value}</strong>
+            </span>
+          ))}
+        </div>
+      </section>
+      <section className="scan-detail-section">
+        <h3><Sparkles size={14} aria-hidden="true" /> Cara Membersihkan</h3>
+        <div className="method-row">
+          <code>{method}</code>
+          <button className="button ghost compact" onClick={() => onCopy(method)}><ButtonIcon icon={Clipboard} />Salin</button>
+        </div>
+        {isAdmin && (
+          <button className={`button compact ${adminApproved ? "ghost dashed" : "danger"}`} onClick={onApproveAdmin} disabled={adminApproved}>
+            <ButtonIcon icon={ShieldAlert} />
+            {adminApproved ? "Admin Clean Diizinkan" : "Saya paham risiko"}
+          </button>
+        )}
+        {selectable && <button className="button ghost compact dashed" disabled>Tambahkan ke Batch Clean</button>}
+      </section>
+    </div>
+  );
+}
+
+function CleanupConfirmDialog({
+  cleanCount,
+  adminCount,
+  totalBytes,
+  skippedCount,
+  phrase,
+  onPhraseChange,
+  onCancel,
+  onRecycle,
+  onPermanent,
+}: {
+  cleanCount: number;
+  adminCount: number;
+  totalBytes: number;
+  skippedCount: number;
+  phrase: string;
+  onPhraseChange: (value: string) => void;
+  onCancel: () => void;
+  onRecycle: () => void;
+  onPermanent: () => void;
+}) {
+  const hasAdmin = adminCount > 0;
+  const adminReady = !hasAdmin || phrase.trim() === ADMIN_CONFIRMATION_PHRASE;
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <div className="dialog admin-clean-dialog" role="dialog" aria-modal="true" aria-label="Bersihkan item terpilih?">
+        <h2>Bersihkan item terpilih?</h2>
+        <p>
+          LeoDisk akan memproses item yang dipilih, melewati file yang terkunci, dan tidak menghapus folder induk sistem.
+        </p>
+        <div className="confirm-summary-grid">
+          <span><small>Clean biasa</small><strong>{cleanCount}</strong></span>
+          <span><small>Admin clean</small><strong>{adminCount}</strong></span>
+          <span><small>Total estimasi</small><strong>{formatBytes(totalBytes)}</strong></span>
+          <span><small>Mungkin dilewati</small><strong>{skippedCount}</strong></span>
+        </div>
+        {hasAdmin && (
+          <label className="phrase-confirm">
+            <span>Ketik <strong>{ADMIN_CONFIRMATION_PHRASE}</strong> untuk mengizinkan Admin Clean.</span>
+            <input
+              value={phrase}
+              onChange={(event) => onPhraseChange(event.target.value)}
+              placeholder={ADMIN_CONFIRMATION_PHRASE}
+              autoFocus
+            />
+          </label>
+        )}
+        <div className="dialog-actions">
+          <button className="button ghost" onClick={onCancel}>Batal</button>
+          <button className="button ghost" disabled={!adminReady} onClick={onRecycle}>
+            <ButtonIcon icon={Archive} />
+            Ke Recycle Bin
+          </button>
+          <button className="button danger" disabled={!adminReady} onClick={onPermanent}>
+            <ButtonIcon icon={Trash2} />
+            Hapus permanen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CleanPage({
@@ -460,9 +897,12 @@ function CleanPage({
 }) {
   const [report, setReport] = useState<CleanupReport>();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [adminUnlocked, setAdminUnlocked] = useState<Set<string>>(new Set());
+  const [adminPhrase, setAdminPhrase] = useState("");
   const [query, setQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<"all" | "low" | "medium" | "high">("all");
-  const [decisionFilter, setDecisionFilter] = useState<"all" | "clean" | "review" | "manual" | "advisory">("all");
+  const [decisionFilter, setDecisionFilter] = useState<"all" | CleanupDecision>("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [sizeFilter, setSizeFilter] = useState<0 | 100 | 500 | 1024>(0);
   const [sort, setSort] = useState<"size" | "name" | "priority">("size");
   const [visibleLimit, setVisibleLimit] = useState(80);
@@ -483,8 +923,10 @@ function CleanPage({
       const result = await invoke<CleanupReport>("scan_deep_cleanup");
       setReport(result);
       setSelected(new Set(result.items.filter((item) => decisionOf(item) === "clean").map((item) => item.id)));
+      setAdminUnlocked(new Set());
+      setAdminPhrase("");
       setReviewed(new Set());
-      setExpanded(new Set());
+      setExpanded(new Set(result.items[0] ? [result.items[0].id] : []));
       setVisibleLimit(80);
     } catch (scanError) {
       setError(messageOf(scanError));
@@ -494,11 +936,19 @@ function CleanPage({
   };
 
   const remove = async (permanent: boolean) => {
+    const selectedItems = allItems.filter((item) => selected.has(item.id));
+    const hasAdmin = selectedItems.some((item) => decisionOf(item) === "admin");
+    if (hasAdmin && adminPhrase.trim() !== ADMIN_CONFIRMATION_PHRASE) {
+      setError(`Ketik ${ADMIN_CONFIRMATION_PHRASE} untuk mengonfirmasi Admin Clean.`);
+      return;
+    }
     setConfirming(false);
     try {
       const result = await invoke<ActionReport>("delete_cleanup_items", {
         itemIds: [...selected],
         permanent,
+        adminConfirmed: hasAdmin,
+        adminConfirmationPhrase: hasAdmin ? adminPhrase.trim() : undefined,
       });
       notify(result.message);
       setReport((current) => {
@@ -517,6 +967,8 @@ function CleanPage({
         return nextReport;
       });
       setSelected(new Set());
+      setAdminUnlocked(new Set());
+      setAdminPhrase("");
     } catch (removeError) {
       setError(messageOf(removeError));
     }
@@ -528,12 +980,26 @@ function CleanPage({
       setError(messageOf(openError));
     }
   };
+  const copyDetail = async (value: string) => {
+    try {
+      await copyText(value);
+      notify("Disalin ke clipboard.");
+    } catch (copyError) {
+      setError(messageOf(copyError));
+    }
+  };
   const exportReport = async (command: "export_cleanup_report" | "export_cleanup_metafile" | "export_cleanup_detail", openFile = false) => {
     setError(undefined);
     try {
       const result = await invoke<ActionReport>(command);
       notify(`Export dibuat: ${result.message}`);
-      if (openFile) await openPath(result.message);
+      if (openFile) {
+        try {
+          await openPath(result.message);
+        } catch (openError) {
+          setError(`Export dibuat di ${result.message}, tetapi tidak bisa dibuka otomatis: ${messageOf(openError)}`);
+        }
+      }
     } catch (exportError) {
       setError(messageOf(exportError));
     }
@@ -541,10 +1007,15 @@ function CleanPage({
 
   useEffect(() => {
     setVisibleLimit(80);
-  }, [query, riskFilter, decisionFilter, sizeFilter, sort]);
+  }, [query, riskFilter, decisionFilter, categoryFilter, sizeFilter, sort]);
 
   const summary = useMemo(() => report ? cleanupSummary(report) : undefined, [report]);
   const allItems = useMemo(() => report ? [...report.items, ...(report.advisories ?? [])] : [], [report]);
+  const selectedItems = useMemo(() => allItems.filter((item) => selected.has(item.id)), [allItems, selected]);
+  const selectedCleanItems = useMemo(() => selectedItems.filter((item) => decisionOf(item) === "clean"), [selectedItems]);
+  const selectedAdminItems = useMemo(() => selectedItems.filter((item) => decisionOf(item) === "admin"), [selectedItems]);
+  const selectedBytes = useMemo(() => selectedItems.reduce((sum, item) => sum + item.sizeBytes, 0), [selectedItems]);
+  const selectedSkipped = useMemo(() => selectedItems.reduce((sum, item) => sum + item.skippedCount, 0), [selectedItems]);
   const filtered = useMemo(() => allItems
     .filter((item) => {
       const haystack = `${item.name ?? item.category} ${item.path} ${item.category} ${item.group ?? ""}`.toLowerCase();
@@ -552,13 +1023,14 @@ function CleanPage({
       return haystack.includes(query.toLowerCase())
         && (riskFilter === "all" || item.riskLevel === riskFilter)
         && (decisionFilter === "all" || decisionOf(item) === decisionFilter)
+        && (!categoryFilter || item.category === categoryFilter)
         && item.sizeBytes >= minBytes;
     })
     .sort((a, b) => {
       if (sort === "name") return (a.name ?? a.category).localeCompare(b.name ?? b.category);
       if (sort === "priority") return (b.priority ?? 0) - (a.priority ?? 0) || b.sizeBytes - a.sizeBytes;
       return b.sizeBytes - a.sizeBytes;
-    }), [allItems, decisionFilter, query, riskFilter, sizeFilter, sort]);
+    }), [allItems, categoryFilter, decisionFilter, query, riskFilter, sizeFilter, sort]);
   const visibleItems = filtered.slice(0, visibleLimit);
   const cleanTop = useMemo(() => report?.items.filter((item) => decisionOf(item) === "clean").slice(0, 5) ?? [], [report]);
   const reviewTop = useMemo(() => report?.items.filter((item) => decisionOf(item) === "review").slice(0, 5) ?? [], [report]);
@@ -591,9 +1063,9 @@ function CleanPage({
           <p>{report ? statusText(report) : "Scan cache, dev artifact, advisory disk hog, dan target manual dalam satu laporan audit."}</p>
         </div>
         <div className="row-buttons">
-          {report && <button className="button ghost" onClick={() => void exportReport("export_cleanup_detail", true)}><ButtonIcon code="OP" />Buka Analyzer</button>}
+          {report && <button className="button ghost" onClick={() => void exportReport("export_cleanup_detail", true)}><ButtonIcon icon={FolderOpen} />Buka Analyzer</button>}
           <button className="button primary" disabled={loading} onClick={scan}>
-            <ButtonIcon code="SC" />
+            <ButtonIcon icon={loading ? Loader2 : Search} />
             {loading ? "Memindai..." : "Pindai Deep Cleanup"}
           </button>
         </div>
@@ -614,9 +1086,9 @@ function CleanPage({
             </div>
             <div className="panel-actions">
               <span>Export audit tanpa scan ulang</span>
-              <button className="button ghost compact" onClick={() => void exportReport("export_cleanup_metafile")}><ButtonIcon code="MF" />Export Metafile</button>
-              <button className="button ghost compact" onClick={() => void exportReport("export_cleanup_report")}><ButtonIcon code="JS" />Export Cleanup Report</button>
-              <button className="button ghost compact" onClick={() => void exportReport("export_cleanup_detail")}><ButtonIcon code="HT" />Export Laporan Detail</button>
+              <button className="button ghost compact" onClick={() => void exportReport("export_cleanup_metafile")}><ButtonIcon icon={Database} />Export Metafile</button>
+              <button className="button ghost compact" onClick={() => void exportReport("export_cleanup_report")}><ButtonIcon icon={Download} />Export Cleanup Report</button>
+              <button className="button ghost compact" onClick={() => void exportReport("export_cleanup_detail")}><ButtonIcon icon={FileSearch} />Export Laporan Detail</button>
             </div>
           </Panel>
           <div className="summary-cards cleanup-scorecards">
@@ -624,8 +1096,14 @@ function CleanPage({
             <Panel title="SIAP DIBERSIHKAN" accent="mint"><div className="metric">{formatBytes(summary?.cleanableBytes)}</div><p className="muted">{summary?.cleanableItems} folder</p></Panel>
             <Panel title="PERLU REVIEW" accent="blue"><div className="metric">{summary?.reviewItems}</div><p className="muted">{formatBytes(summary?.reviewBytes)}</p></Panel>
             <Panel title="MANUAL / TERTAHAN" accent="amber"><div className="metric">{summary?.manualItems}</div><p className="muted">{formatBytes(summary?.manualBytes)}</p></Panel>
+            <Panel title="ADMIN CLEAN" accent="amber"><div className="metric">{summary?.adminItems ?? 0}</div><p className="muted">{formatBytes(summary?.adminBytes ?? 0)}</p></Panel>
             <Panel title="DISK HOG ADVISORY" accent="blue"><div className="metric">{formatBytes(summary?.advisoryBytes)}</div><p className="muted">{summary?.advisoryItems} temuan</p></Panel>
           </div>
+          <CleanupCharts
+            report={report}
+            selectedCategory={categoryFilter}
+            onSelectCategory={(category) => setCategoryFilter((current) => current === category ? "" : category)}
+          />
           <div className="cleanup-priority-grid">
             <Panel title="PRIORITAS AMAN TERBESAR" accent="mint" tag={`${cleanTop.length} kandidat teratas`}>
               <div className="priority-list">
@@ -637,7 +1115,7 @@ function CleanPage({
                     <small>{item.safetyNote}</small>
                     <b>{formatBytes(item.sizeBytes)}</b>
                     <div className="priority-actions">
-                      <button className="button ghost compact" onClick={() => selectIds([item.id])}><ButtonIcon code="+" />Pilih</button>
+                      <button className="button ghost compact" onClick={() => selectIds([item.id])}><ButtonIcon icon={Check} />Pilih</button>
                       <button className="text-action" onClick={() => void openLocation(item.id)}>Buka Folder</button>
                     </div>
                   </article>
@@ -708,9 +1186,16 @@ function CleanPage({
               <select value={decisionFilter} onChange={(event) => setDecisionFilter(event.target.value as typeof decisionFilter)}>
                 <option value="all">Semua Keputusan</option>
                 <option value="clean">Clean</option>
+                <option value="admin">Admin Clean</option>
                 <option value="review">Review</option>
                 <option value="manual">Manual</option>
                 <option value="advisory">Advisory</option>
+              </select>
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+                <option value="">Semua Kategori</option>
+                {(report.categoryTotals ?? []).map((item) => (
+                  <option key={`${item.group}-${item.category}`} value={item.category}>{item.category}</option>
+                ))}
               </select>
               <select value={sizeFilter} onChange={(event) => setSizeFilter(Number(event.target.value) as typeof sizeFilter)}>
                 <option value={0}>Semua Ukuran</option>
@@ -724,11 +1209,17 @@ function CleanPage({
                 <option value="priority">Rekomendasi</option>
               </select>
             </div>
-            <p className="protected-note">Centang item berlabel Siap Dibersihkan untuk masuk batch clean. Item lain tetap ditahan sampai review manual.</p>
+            <p className="protected-note">Clean biasa bisa dipilih langsung. Admin Clean harus diizinkan manual, lalu tetap membutuhkan phrase konfirmasi saat hapus.</p>
+            {categoryFilter && (
+              <button className="filter-chip" onClick={() => setCategoryFilter("")}>
+                <X size={14} aria-hidden="true" /> Filter kategori: {categoryFilter}
+              </button>
+            )}
             <div className="deep-cleanup-list">
               {visibleItems.map((item) => {
                 const decision = decisionOf(item);
-                const selectable = decision === "clean";
+                const isAdmin = decision === "admin";
+                const selectable = decision === "clean" || (isAdmin && adminUnlocked.has(item.id));
                 const isReviewed = reviewed.has(item.id);
                 const isExpanded = expanded.has(item.id);
                 return (
@@ -752,6 +1243,7 @@ function CleanPage({
                       <strong>{item.name ?? item.category}</strong>
                       <small>{item.category} - {decisionLabel(decision)} - {riskLabel(item.riskLevel)} - {item.kind ?? "folder"}</small>
                       <small className={`safety ${selectable ? "safe" : "review"}`}>{item.safetyLabel} - {item.safetyNote}</small>
+                      <small className="cleanup-meta">{item.scope ?? "User-level"} - {item.detectedBy ?? "Known path"} - {item.confidenceLabel ?? "Reviewed"}</small>
                       {item.blockedReason && <small className="safety review">{item.blockedReason}</small>}
                       {isReviewed && <small className="safety safe">Sudah dicek manual</small>}
                     </span>
@@ -759,16 +1251,19 @@ function CleanPage({
                     <span className="mono">{item.fileCount} file</span>
                     <div className="row-actions">
                       <button className="text-action" onClick={() => toggleExpanded(item.id)}>{isExpanded ? "Tutup" : "Detail"}</button>
-                      {!selectable && <button className="text-action" onClick={() => markReviewed(item.id)}>Cek</button>}
+                      {isAdmin && !adminUnlocked.has(item.id) && <button className="text-action warning" onClick={() => setAdminUnlocked((current) => new Set(current).add(item.id))}>Izinkan</button>}
+                      {!selectable && !isAdmin && <button className="text-action" onClick={() => markReviewed(item.id)}>Cek</button>}
                       <button className="text-action" onClick={() => void openLocation(item.id)}>Buka</button>
                     </div>
                     {isExpanded && (
-                      <div className="cleanup-row-detail">
-                        <span><strong>Path</strong><code>{item.path}</code></span>
-                        <span><strong>Rekomendasi</strong>{item.recommendation ?? item.safetyNote}</span>
-                        <span><strong>Status</strong>{item.status ?? decision} - priority {item.priority ?? 0}</span>
-                        <span><strong>Audit</strong>{item.fileCount} file, {item.skippedCount} terlewati, {formatBytes(item.sizeBytes)}</span>
-                      </div>
+                      <CleanupEvidenceCard
+                        item={item}
+                        selectable={selectable}
+                        adminApproved={adminUnlocked.has(item.id)}
+                        onApproveAdmin={() => setAdminUnlocked((current) => new Set(current).add(item.id))}
+                        onOpen={() => void openLocation(item.id)}
+                        onCopy={(value) => void copyDetail(value)}
+                      />
                     )}
                   </article>
                 );
@@ -776,18 +1271,21 @@ function CleanPage({
               {!filtered.length && <EmptyState>Tidak ada item sesuai filter.</EmptyState>}
               {visibleItems.length < filtered.length && (
                 <button className="button ghost load-more" onClick={() => setVisibleLimit((current) => current + 80)}>
-                  <ButtonIcon code="++" />
+                  <ButtonIcon icon={ChevronUp} />
                   Tampilkan 80 lagi
                 </button>
               )}
             </div>
             <div className="panel-actions">
-              <span>{selected.size} clean dipilih - {reviewed.size} sudah dicek</span>
-              <button className="button ghost compact" disabled={!cleanIds.length} onClick={() => selectIds(cleanIds)}><ButtonIcon code="++" />Pilih semua Clean</button>
-              <button className="button ghost compact" disabled={!filteredCleanIds.length} onClick={() => selectIds(filteredCleanIds)}><ButtonIcon code="+F" />Pilih Clean terfilter</button>
-              <button className="button ghost compact" disabled={!selected.size} onClick={() => setSelected(new Set())}><ButtonIcon code="--" />Unselect all</button>
-              <button className="button danger" disabled={!selected.size} onClick={() => setConfirming(true)}>
-                <ButtonIcon code="RM" />
+              <span>{selectedCleanItems.length} clean + {selectedAdminItems.length} admin dipilih - {formatBytes(selectedBytes)} - {reviewed.size} sudah dicek</span>
+              <button className="button ghost compact" disabled={!cleanIds.length} onClick={() => selectIds(cleanIds)}><ButtonIcon icon={ShieldCheck} />Pilih semua Clean</button>
+              <button className="button ghost compact" disabled={!filteredCleanIds.length} onClick={() => selectIds(filteredCleanIds)}><ButtonIcon icon={Check} />Pilih Clean terfilter</button>
+              <button className="button ghost compact" disabled={!selected.size} onClick={() => setSelected(new Set())}><ButtonIcon icon={X} />Unselect all</button>
+              <button className="button danger" disabled={!selected.size} onClick={() => {
+                setAdminPhrase("");
+                setConfirming(true);
+              }}>
+                <ButtonIcon icon={Trash2} />
                 Hapus item terpilih
               </button>
             </div>
@@ -795,14 +1293,16 @@ function CleanPage({
         </>
       )}
       {confirming && (
-        <ConfirmDialog
-          title="Bersihkan item terpilih?"
-          description="Hanya item berkeputusan Clean yang masuk batch. Pilih Recycle Bin untuk dapat memulihkan file, atau Hapus permanen jika Anda yakin."
-          confirmLabel="Hapus permanen"
+        <CleanupConfirmDialog
+          cleanCount={selectedCleanItems.length}
+          adminCount={selectedAdminItems.length}
+          totalBytes={selectedBytes}
+          skippedCount={selectedSkipped}
+          phrase={adminPhrase}
+          onPhraseChange={setAdminPhrase}
           onCancel={() => setConfirming(false)}
-          alternateLabel="Ke Recycle Bin"
-          onAlternate={() => void remove(false)}
-          onConfirm={() => void remove(true)}
+          onRecycle={() => void remove(false)}
+          onPermanent={() => void remove(true)}
         />
       )}
     </div>
@@ -1239,6 +1739,61 @@ type ScanStatus = {
   error?: string;
 };
 
+function fileCategoryLabel(path: string) {
+  const lower = path.toLowerCase();
+  if (/\.(mp4|mkv|mov|avi|webm|wmv)$/.test(lower)) return "Video";
+  if (/\.(png|jpg|jpeg|gif|webp|psd|svg|heic)$/.test(lower)) return "Gambar";
+  if (/\.(mp3|wav|flac|aac|ogg)$/.test(lower)) return "Audio";
+  if (/\.(pdf|docx?|xlsx?|pptx?|txt|md)$/.test(lower)) return "Dokumen";
+  if (/\.(zip|rar|7z|msi|exe|iso|tar|gz)$/.test(lower)) return "Arsip & installer";
+  if (lower.includes("\\appdata\\") || lower.includes("/appdata/") || lower.includes("cache")) return "Data aplikasi/cache";
+  return "Lainnya";
+}
+
+function StorageCategoryChart({
+  result,
+  selected,
+  onSelect,
+}: {
+  result: DiskScanResult;
+  selected: string;
+  onSelect: (category: string) => void;
+}) {
+  const data = result.categories.map((item) => ({ name: item.label, value: item.sizeBytes, files: item.fileCount }));
+  return (
+    <Panel title="GRAFIK STORAGE" accent="blue" tag={selected || "Semua kategori"}>
+      <div className="storage-chart-layout">
+        <div className="chart-box compact-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" innerRadius={48} outerRadius={84} paddingAngle={3}>
+                {data.map((entry, index) => (
+                  <Cell key={entry.name} fill={entry.name === selected ? "#f2ede4" : CHART_COLORS[index % CHART_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ByteTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="category-grid chart-category-grid">
+          {result.categories.map((category, index) => (
+            <button
+              className={`category-card ${category.colorKey} ${selected === category.label ? "active" : ""}`}
+              key={category.label}
+              onClick={() => onSelect(selected === category.label ? "" : category.label)}
+            >
+              <span>{category.label}</span>
+              <strong>{formatBytes(category.sizeBytes)}</strong>
+              <small>{category.fileCount} file</small>
+              <i style={{ background: CHART_COLORS[index % CHART_COLORS.length] }} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function AnalyzePage({
   active,
   notify,
@@ -1256,7 +1811,11 @@ function AnalyzePage({
   const [progress, setProgress] = useState<DiskScanProgress>();
   const [result, setResult] = useState<DiskScanResult>();
   const [resultHistory, setResultHistory] = useState<DiskScanResult[]>([]);
-  const [analyzerTab, setAnalyzerTab] = useState("Laporan");
+  const [analyzerTabs, setAnalyzerTabs] = useState(defaultAnalyzerTabs);
+  const [analyzerTab, setAnalyzerTab] = useState(defaultAnalyzerTabs[0].id);
+  const [storageCategoryFilter, setStorageCategoryFilter] = useState("");
+  const [droppedReviewFiles, setDroppedReviewFiles] = useState<string[]>([]);
+  const [dropActive, setDropActive] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string>();
@@ -1265,9 +1824,11 @@ function AnalyzePage({
   const pendingProgress = useRef<DiskScanProgress | undefined>(undefined);
   const pendingResult = useRef<DiskScanResult | undefined>(undefined);
   const pendingError = useRef<{ jobId: string; message: string } | undefined>(undefined);
+  const startFromDrop = useRef<(root: string) => void>(() => {});
   const readPendingResult = () => pendingResult.current;
   const readPendingError = () => pendingError.current;
   const readPendingProgress = () => pendingProgress.current;
+  const sortableSensors = useSortableSensors();
 
   useEffect(() => {
     onScanStatus({ job, progress, error });
@@ -1280,6 +1841,7 @@ function AnalyzePage({
     setJob(undefined);
     activeJobId.current = undefined;
     setSelected(new Set());
+    setStorageCategoryFilter("");
   };
   const failScan = (message: string) => {
     setError(message);
@@ -1303,6 +1865,41 @@ function AnalyzePage({
   useEffect(() => {
     if (active) void loadVolumes();
   }, [active]);
+
+  useEffect(() => {
+    let mounted = true;
+    void getCurrentWebview().onDragDropEvent((event) => {
+      if (!mounted) return;
+      const payload = event.payload as { type?: string; paths?: string[] };
+      if (payload.type === "over") {
+        setDropActive(true);
+        return;
+      }
+      if (payload.type === "cancel") {
+        setDropActive(false);
+        return;
+      }
+      if (payload.type !== "drop") return;
+      setDropActive(false);
+      const paths = payload.paths ?? [];
+      const fileLike = paths.filter((path) => /\.[a-z0-9]{1,8}$/i.test(path));
+      const folderLike = paths.find((path) => !fileLike.includes(path));
+      if (fileLike.length) {
+        setDroppedReviewFiles((current) => [...fileLike, ...current].slice(0, 20));
+        setAnalyzerTab("review");
+        notify(`${fileLike.length} file masuk Review Queue.`);
+      }
+      if (folderLike) {
+        setAnalyzerTab("report");
+        startFromDrop.current(folderLike);
+      }
+    }).then((unlisten) => {
+      if (!mounted) unlisten();
+    }).catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [notify]);
 
   useEffect(() => {
     let mounted = true;
@@ -1380,6 +1977,9 @@ function AnalyzePage({
       acceptingStartEvents.current = false;
       setStartingScan(false);
     }
+  };
+  startFromDrop.current = (root: string) => {
+    void start(root);
   };
   const choose = async () => {
     try {
@@ -1464,9 +2064,18 @@ function AnalyzePage({
   };
   const tiles = result ? treemapLayout(result.folders) : [];
   const busy = !!job || startingScan;
-  const analyzerTabs = ["Laporan", "Network Graph", "Treemap", "Largest Files", "Largest Folders", "Review Queue", "Deep Cleaner", "Uninstaller", "Performance", "Pinned (0)", "Browser/App", "History"];
+  const filteredLargeFiles = result?.largestFiles.filter((file) => !storageCategoryFilter || fileCategoryLabel(file.path) === storageCategoryFilter) ?? [];
+  const handleAnalyzerDragEnd = (event: DragEndEvent) => {
+    const { active: activeItem, over } = event;
+    if (!over || activeItem.id === over.id) return;
+    setAnalyzerTabs((current) => {
+      const oldIndex = current.findIndex((item) => item.id === activeItem.id);
+      const newIndex = current.findIndex((item) => item.id === over.id);
+      return oldIndex >= 0 && newIndex >= 0 ? arrayMove(current, oldIndex, newIndex) : current;
+    });
+  };
   return (
-    <div className="feature-page analyze-page">
+    <div className={`feature-page analyze-page ${dropActive ? "drop-active" : ""}`}>
       <div className="analyze-toolbar">
         <div className="breadcrumbs">
           <button disabled={busy} onClick={() => { setResult(undefined); setResultHistory([]); }}>Drive</button>
@@ -1484,6 +2093,12 @@ function AnalyzePage({
         </div>
       </div>
       <ErrorBanner message={error} />
+      {dropActive && (
+        <div className="drop-overlay" role="status">
+          <FolderOpen size={28} aria-hidden="true" />
+          <strong>Lepaskan folder untuk scan atau file untuk review</strong>
+        </div>
+      )}
       {!result && (
         <>
           <div className="storage-settings">
@@ -1544,9 +2159,21 @@ function AnalyzePage({
               <span><strong>{result.inaccessible}</strong>Inaccessible</span>
             </div>
             <div className="analyzer-tabs">
-              {analyzerTabs.map((item) => (
-                <button className={analyzerTab === item ? "active" : ""} key={item} onClick={() => setAnalyzerTab(item)}>{item}</button>
-              ))}
+              <DndContext sensors={sortableSensors} collisionDetection={closestCenter} onDragEnd={handleAnalyzerDragEnd}>
+                <SortableContext items={analyzerTabs.map((item) => item.id)} strategy={horizontalListSortingStrategy}>
+                  {analyzerTabs.map((item) => (
+                    <SortableTabButton
+                      className="analyzer-tab-button"
+                      active={analyzerTab === item.id}
+                      icon={item.icon}
+                      id={item.id}
+                      key={item.id}
+                      label={item.label}
+                      onClick={() => setAnalyzerTab(item.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </div>
           </Panel>
           <div className="analyze-layout">
@@ -1593,14 +2220,19 @@ function AnalyzePage({
               </div>
             </section>
           </div>
+          <StorageCategoryChart
+            result={result}
+            selected={storageCategoryFilter}
+            onSelect={setStorageCategoryFilter}
+          />
           <Panel title="PENYEBAB PENGGUNAAN RUANG" accent="mint" tag={`${result.categories.length} kategori`}>
             <div className="category-grid">
               {result.categories.map((category) => (
-                <div className={`category-card ${category.colorKey}`} key={category.label}>
+                <button className={`category-card ${category.colorKey} ${storageCategoryFilter === category.label ? "active" : ""}`} key={category.label} onClick={() => setStorageCategoryFilter((current) => current === category.label ? "" : category.label)}>
                   <span>{category.label}</span>
                   <strong>{formatBytes(category.sizeBytes)}</strong>
                   <small>{category.fileCount} file</small>
-                </div>
+                </button>
               ))}
             </div>
             {!!result.inaccessible && (
@@ -1609,9 +2241,14 @@ function AnalyzePage({
               </p>
             )}
           </Panel>
-          <Panel title="FILE BESAR - PERIKSA SEBELUM DIHAPUS (MIN. 100 MB)" accent="amber" tag={`${result.largestFiles.length} file`}>
+          <Panel title="FILE BESAR - PERIKSA SEBELUM DIHAPUS (MIN. 100 MB)" accent="amber" tag={`${filteredLargeFiles.length} file`}>
+            {storageCategoryFilter && (
+              <button className="filter-chip" onClick={() => setStorageCategoryFilter("")}>
+                <X size={14} aria-hidden="true" /> Filter storage: {storageCategoryFilter}
+              </button>
+            )}
             <div className="large-files-list">
-            {result.largestFiles.map((file) => (
+            {filteredLargeFiles.map((file) => (
               <div className="cleanup-row large-file-row" key={file.itemId}>
                 <input type="checkbox" aria-label={`Pilih ${file.name}`} checked={selected.has(file.itemId)} onChange={() => setSelected((current) => {
                   const next = new Set(current);
@@ -1628,13 +2265,28 @@ function AnalyzePage({
               </div>
             ))}
             </div>
-            {!result.largestFiles.length && <EmptyState>Tidak ditemukan file di atas 100 MB.</EmptyState>}
-            {!!result.largestFiles.length && (
+            {!filteredLargeFiles.length && <EmptyState>Tidak ditemukan file di atas 100 MB untuk filter ini.</EmptyState>}
+            {!!filteredLargeFiles.length && (
               <div className="panel-actions">
                 <span>{selected.size} file dipilih - file besar tidak otomatis aman dihapus</span>
                 <button className="button danger" disabled={!selected.size} onClick={() => setConfirming(true)}>Hapus file dipilih</button>
               </div>
             )}
+          </Panel>
+          <Panel title="REVIEW QUEUE DROP" accent="blue" tag={`${droppedReviewFiles.length} file manual`}>
+            <div className="drop-review-list">
+              {droppedReviewFiles.map((path) => (
+                <article className="drop-review-item" key={path}>
+                  <FileSearch size={18} aria-hidden="true" />
+                  <span>
+                    <strong>{path.split(/[\\/]/).pop() || path}</strong>
+                    <small>{path}</small>
+                  </span>
+                  <b>{fileCategoryLabel(path)}</b>
+                </article>
+              ))}
+              {!droppedReviewFiles.length && <EmptyState>Drag file dari Explorer ke LeoDisk untuk memasukkannya ke antrean review manual.</EmptyState>}
+            </div>
           </Panel>
         </>
       )}
@@ -1655,10 +2307,12 @@ function AnalyzePage({
 
 function App() {
   const [tab, setTab] = useState<Tab>("status");
+  const [navTabs, setNavTabs] = useState(defaultTabs);
   const [latestCleanup, setLatestCleanup] = useState<CleanupReport>();
   const [toast, setToast] = useState<string>();
   const [scanStatus, setScanStatus] = useState<ScanStatus>({});
-  const currentLabel = useMemo(() => tabs.find((item) => item.id === tab)?.label, [tab]);
+  const currentLabel = useMemo(() => navTabs.find((item) => item.id === tab)?.label, [navTabs, tab]);
+  const sortableSensors = useSortableSensors();
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(undefined), 4000);
@@ -1672,6 +2326,15 @@ function App() {
       notify(messageOf(cancelError));
     }
   };
+  const handleNavDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setNavTabs((current) => {
+      const oldIndex = current.findIndex((item) => item.id === active.id);
+      const newIndex = current.findIndex((item) => item.id === over.id);
+      return oldIndex >= 0 && newIndex >= 0 ? arrayMove(current, oldIndex, newIndex) : current;
+    });
+  };
 
   return (
     <AppErrorBoundary>
@@ -1679,16 +2342,20 @@ function App() {
         <header className="topbar">
           <div className="brand"><span className="brand-mark">L</span><strong>LeoDisk</strong></div>
           <nav className="nav-pill" aria-label="Navigasi utama">
-            {tabs.map((item) => (
-              <button
-                key={item.id}
-                className={tab === item.id ? "active" : ""}
-                onClick={() => setTab(item.id)}
-              >
-                <span className="nav-icon" aria-hidden="true">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
+            <DndContext sensors={sortableSensors} collisionDetection={closestCenter} onDragEnd={handleNavDragEnd}>
+              <SortableContext items={navTabs.map((item) => item.id)} strategy={horizontalListSortingStrategy}>
+                {navTabs.map((item) => (
+                  <SortableTabButton
+                    active={tab === item.id}
+                    icon={item.icon}
+                    id={item.id}
+                    key={item.id}
+                    label={item.label}
+                    onClick={() => setTab(item.id)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </nav>
           <div className="topbar-status">
             <span className="current-tab">{currentLabel}</span>
@@ -1703,7 +2370,9 @@ function App() {
         </header>
         <div className="workspace">
           {tab === "status" && <StatusPage active latestCleanup={latestCleanup} />}
-          {tab === "clean" && <CleanPage onReport={setLatestCleanup} notify={notify} />}
+          <div hidden={tab !== "clean"}>
+            <CleanPage onReport={setLatestCleanup} notify={notify} />
+          </div>
           {tab === "purge" && <PurgePage notify={notify} />}
           {tab === "apps" && <AppsPage active notify={notify} />}
           {tab === "optimize" && <OptimizePage active notify={notify} />}

@@ -20,6 +20,7 @@ pub struct TrackedDeletion {
     pub mode: DeleteMode,
     pub estimated_bytes: u64,
     pub clean_allowed: bool,
+    pub decision: String,
 }
 
 pub struct AppState {

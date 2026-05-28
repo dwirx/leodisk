@@ -19,6 +19,8 @@ use crate::{
     util::{normalized_path, opaque_id, path_display},
 };
 
+const ADMIN_CONFIRMATION_PHRASE: &str = "SAYA MENGERTI";
+
 #[derive(Clone)]
 struct ScanRoot {
     name: String,
@@ -36,7 +38,27 @@ struct ScanRoot {
     safety_label: String,
     safety_note: String,
     recommendation: String,
+    scope: String,
+    detected_by: String,
+    detail_tags: Vec<String>,
+    confidence_label: String,
     advisory: bool,
+}
+
+impl ScanRoot {
+    fn with_metadata(
+        mut self,
+        scope: &str,
+        detected_by: &str,
+        detail_tags: Vec<&str>,
+        confidence_label: &str,
+    ) -> Self {
+        self.scope = scope.into();
+        self.detected_by = detected_by.into();
+        self.detail_tags = detail_tags.into_iter().map(str::to_string).collect();
+        self.confidence_label = confidence_label.into();
+        self
+    }
 }
 
 fn timestamp() -> String {
@@ -62,7 +84,10 @@ fn scan_root(
 ) -> ScanRoot {
     let validation_root = match mode {
         DeleteMode::Children => path.clone(),
-        DeleteMode::SelfItem => path.parent().map(Path::to_path_buf).unwrap_or_else(|| path.clone()),
+        DeleteMode::SelfItem => path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| path.clone()),
     };
     ScanRoot {
         name: name.into(),
@@ -80,11 +105,30 @@ fn scan_root(
         safety_label: safety_label.into(),
         safety_note: safety_note.into(),
         recommendation: recommendation.into(),
+        scope: "User-level".into(),
+        detected_by: "Known cleanup path".into(),
+        detail_tags: vec![category.into(), group.into()],
+        confidence_label: if decision == "clean" {
+            "High confidence".into()
+        } else if decision == "admin" {
+            "Admin confirmation required".into()
+        } else if decision == "advisory" {
+            "Audit only".into()
+        } else {
+            "Manual review".into()
+        },
         advisory: decision == "advisory",
     }
 }
 
-fn safe_root(name: &str, category: &str, group: &str, path: PathBuf, priority: u32, icon: &str) -> ScanRoot {
+fn safe_root(
+    name: &str,
+    category: &str,
+    group: &str,
+    path: PathBuf,
+    priority: u32,
+    icon: &str,
+) -> ScanRoot {
     scan_root(
         name,
         category,
@@ -121,13 +165,32 @@ fn safe_self_root(category: &str, path: PathBuf) -> Option<ScanRoot> {
             "Berkas cache user-level; Windows atau aplikasi akan membuatnya kembali bila diperlukan."
                 .into(),
         recommendation: "Bersihkan bila aplikasi terkait sedang tidak aktif.".into(),
+        scope: "User-level".into(),
+        detected_by: "Known cache file pattern".into(),
+        detail_tags: vec![category.into(), "file-cache".into()],
+        confidence_label: "High confidence".into(),
         advisory: false,
     })
 }
 
-fn add_root(roots: &mut Vec<ScanRoot>, name: &str, category: &str, group: &str, path: PathBuf, priority: u32, icon: &str) {
+fn add_root(
+    roots: &mut Vec<ScanRoot>,
+    name: &str,
+    category: &str,
+    group: &str,
+    path: PathBuf,
+    priority: u32,
+    icon: &str,
+) {
     if path.exists() {
-        roots.push(safe_root(name, category, group, normalized_path(&path), priority, icon));
+        roots.push(safe_root(
+            name,
+            category,
+            group,
+            normalized_path(&path),
+            priority,
+            icon,
+        ));
     }
 }
 
@@ -195,6 +258,95 @@ fn add_manual_root(
     }
 }
 
+fn add_admin_audit_root(
+    roots: &mut Vec<ScanRoot>,
+    name: &str,
+    category: &str,
+    group: &str,
+    path: PathBuf,
+    priority: u32,
+    icon: &str,
+    note: &str,
+    recommendation: &str,
+) {
+    if path.exists() {
+        roots.push(admin_audit_root(
+            name,
+            category,
+            group,
+            normalized_path(&path),
+            priority,
+            icon,
+            note,
+            recommendation,
+        ));
+    }
+}
+
+fn admin_audit_root(
+    name: &str,
+    category: &str,
+    group: &str,
+    path: PathBuf,
+    priority: u32,
+    icon: &str,
+    note: &str,
+    recommendation: &str,
+) -> ScanRoot {
+    scan_root(
+        name,
+        category,
+        group,
+        path,
+        DeleteMode::SelfItem,
+        "advisory",
+        "high",
+        priority,
+        icon,
+        "Audit admin",
+        note,
+        recommendation,
+    )
+    .with_metadata(
+        "Admin/system audit",
+        "Protected Windows path",
+        vec!["admin", "system", "audit-only"],
+        "Audit only",
+    )
+}
+
+fn admin_clean_root(
+    name: &str,
+    category: &str,
+    group: &str,
+    path: PathBuf,
+    priority: u32,
+    icon: &str,
+    note: &str,
+    recommendation: &str,
+) -> ScanRoot {
+    scan_root(
+        name,
+        category,
+        group,
+        path,
+        DeleteMode::Children,
+        "admin",
+        "high",
+        priority,
+        icon,
+        "Butuh konfirmasi admin",
+        note,
+        recommendation,
+    )
+    .with_metadata(
+        "Admin/system clean",
+        "Protected Windows path",
+        vec!["admin", "system", "confirmation-required"],
+        "Admin confirmation required",
+    )
+}
+
 fn add_matching_files(
     roots: &mut Vec<ScanRoot>,
     category: &str,
@@ -235,16 +387,56 @@ fn browser_profiles(base: PathBuf) -> Vec<PathBuf> {
 fn cleanup_roots() -> Vec<ScanRoot> {
     let mut roots = Vec::new();
     if let Ok(temp) = env::var("TEMP") {
-        add_root(&mut roots, "User Temp (%TEMP%)", "System Cache", "System Cache", PathBuf::from(temp), 86, "temp");
+        add_root(
+            &mut roots,
+            "User Temp (%TEMP%)",
+            "System Cache",
+            "System Cache",
+            PathBuf::from(temp),
+            86,
+            "temp",
+        );
     }
     if let Ok(tmp) = env::var("TMP") {
-        add_root(&mut roots, "User Temp (%TMP%)", "System Cache", "System Cache", PathBuf::from(tmp), 85, "temp");
+        add_root(
+            &mut roots,
+            "User Temp (%TMP%)",
+            "System Cache",
+            "System Cache",
+            PathBuf::from(tmp),
+            85,
+            "temp",
+        );
     }
     if let Ok(local) = env::var("LOCALAPPDATA") {
         let local = PathBuf::from(local);
-        add_root(&mut roots, "Windows Temp", "System Cache", "System Cache", local.join("Temp"), 100, "windows");
-        add_root(&mut roots, "DirectX Shader Cache", "System Cache", "System Cache", local.join("D3DSCache"), 55, "gpu");
-        add_root(&mut roots, "Crash Dumps", "System Cache", "System Cache", local.join("CrashDumps"), 52, "crash");
+        add_root(
+            &mut roots,
+            "Windows Temp",
+            "System Cache",
+            "System Cache",
+            local.join("Temp"),
+            100,
+            "windows",
+        );
+        add_root(
+            &mut roots,
+            "DirectX Shader Cache",
+            "System Cache",
+            "System Cache",
+            local.join("D3DSCache"),
+            55,
+            "gpu",
+        );
+        add_root(
+            &mut roots,
+            "Crash Dumps",
+            "System Cache",
+            "System Cache",
+            local.join("CrashDumps"),
+            52,
+            "crash",
+        );
         add_root(
             &mut roots,
             "Windows Error Reports",
@@ -282,9 +474,35 @@ fn cleanup_roots() -> Vec<ScanRoot> {
             ("Discord", local.join("Discord")),
             ("Slack", local.join("slack")),
             ("Microsoft Teams", local.join("Microsoft/Teams")),
+            (
+                "Teams Work/School",
+                local.join("Packages/MSTeams_8wekyb3d8bbwe/LocalCache/Microsoft/MSTeams"),
+            ),
+            ("Zoom", local.join("Zoom")),
+            ("Figma", local.join("Figma")),
+            ("Notion", local.join("Programs/Notion")),
+            ("Obsidian", local.join("Obsidian")),
+            ("Postman", local.join("Postman")),
+            ("Spotify", local.join("Spotify")),
         ] {
-            for cache in ["Cache", "Code Cache", "GPUCache", "DawnCache", "logs"] {
-                add_root(&mut roots, &format!("{name} Cache"), "App Cache", "App Cache", path.join(cache), 66, "app");
+            for cache in [
+                "Cache",
+                "Code Cache",
+                "GPUCache",
+                "DawnCache",
+                "ShaderCache",
+                "logs",
+                "Crashpad/reports",
+            ] {
+                add_root(
+                    &mut roots,
+                    &format!("{name} Cache"),
+                    "App Cache",
+                    "App Cache",
+                    path.join(cache),
+                    66,
+                    "app",
+                );
             }
         }
         for (name, path) in [
@@ -292,6 +510,17 @@ fn cleanup_roots() -> Vec<ScanRoot> {
             ("Google Chrome", local.join("Google/Chrome/User Data")),
             ("Brave", local.join("BraveSoftware/Brave-Browser/User Data")),
             ("Opera", local.join("Opera Software/Opera Stable")),
+            ("Vivaldi", local.join("Vivaldi/User Data")),
+            (
+                "Arc",
+                local.join(
+                    "Packages/TheBrowserCompany.Arc_ttt1ap7aakyb4/LocalCache/Local/Arc/User Data",
+                ),
+            ),
+            (
+                "Yandex Browser",
+                local.join("Yandex/YandexBrowser/User Data"),
+            ),
         ] {
             let profiles = if path.join("Preferences").exists() {
                 vec![path]
@@ -309,20 +538,212 @@ fn cleanup_roots() -> Vec<ScanRoot> {
                     "Media Cache",
                     "Service Worker/CacheStorage",
                 ] {
-                    add_root(&mut roots, &format!("{name} Cache"), "Browser Cache", "Browser Cache", profile.join(cache), 64, "browser");
+                    add_root(
+                        &mut roots,
+                        &format!("{name} Cache"),
+                        "Browser Cache",
+                        "Browser Cache",
+                        profile.join(cache),
+                        64,
+                        "browser",
+                    );
                 }
             }
         }
-        add_root(&mut roots, "VS Code Cache", "Dev Cache", "Dev Cache", local.join("Microsoft/VSCode/Cache"), 67, "code");
-        add_root(&mut roots, "VS Code Cached Data", "Dev Cache", "Dev Cache", local.join("Microsoft/VSCode/CachedData"), 67, "code");
-        add_root(&mut roots, "NPM Cache", "Dev Cache", "Dev Cache", local.join("npm-cache"), 92, "package");
-        add_root(&mut roots, "Yarn Cache", "Dev Cache", "Dev Cache", local.join("Yarn/Cache"), 80, "package");
-        add_review_root(&mut roots, "PNPM Store", "Dev Cache", "Dev Cache", local.join("pnpm/store"), 75, "package", "PNPM store bisa dipakai banyak proyek dan perlu review manual.");
-        add_review_root(&mut roots, "Bun Cache", "Dev Cache", "Dev Cache", local.join("bun/install/cache"), 76, "package", "Bun cache dapat dibuat ulang, tetapi sebagian isi mungkin sedang dipakai.");
-        add_root(&mut roots, "Playwright Browser Cache", "Dev Cache", "Dev Cache", local.join("ms-playwright"), 88, "browser");
-        add_root(&mut roots, "NVIDIA Shader Cache", "Game Cache", "Game Cache", local.join("NVIDIA/DXCache"), 68, "gpu");
-        add_root(&mut roots, "NVIDIA OpenGL Cache", "Game Cache", "Game Cache", local.join("NVIDIA/GLCache"), 67, "gpu");
-        add_root(&mut roots, "AMD Shader Cache", "Game Cache", "Game Cache", local.join("AMD/DxCache"), 67, "gpu");
+        add_root(
+            &mut roots,
+            "VS Code Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Microsoft/VSCode/Cache"),
+            67,
+            "code",
+        );
+        add_root(
+            &mut roots,
+            "VS Code Cached Data",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Microsoft/VSCode/CachedData"),
+            67,
+            "code",
+        );
+        add_root(
+            &mut roots,
+            "VS Code GPU Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Microsoft/VSCode/GPUCache"),
+            66,
+            "code",
+        );
+        add_root(
+            &mut roots,
+            "VS Code Logs",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Microsoft/VSCode/logs"),
+            56,
+            "logs",
+        );
+        add_root(
+            &mut roots,
+            "JetBrains System Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("JetBrains"),
+            61,
+            "code",
+        );
+        add_review_root(&mut roots, "Android Studio Cache", "Dev Cache", "Dev Cache", local.join("Google/AndroidStudio2024.1"), 58, "android", "Cache Android Studio dapat besar, tetapi sebagian berisi indeks dan konfigurasi yang perlu review.");
+        add_root(
+            &mut roots,
+            "Gradle User Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Gradle/caches"),
+            74,
+            "package",
+        );
+        add_review_root(&mut roots, "Docker Desktop Logs", "Dev Cache", "Dev Cache", local.join("Docker/log"), 54, "docker", "Log Docker Desktop aman untuk direview, tetapi pastikan tidak sedang dipakai untuk troubleshooting.");
+        add_review_root(
+            &mut roots,
+            "Docker Desktop Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Docker/wsl"),
+            44,
+            "docker",
+            "Cache/WSL Docker bisa terkait image atau volume; jangan hapus otomatis.",
+        );
+        add_root(
+            &mut roots,
+            "NPM Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("npm-cache"),
+            92,
+            "package",
+        );
+        add_root(
+            &mut roots,
+            "Yarn Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Yarn/Cache"),
+            80,
+            "package",
+        );
+        add_root(
+            &mut roots,
+            "NuGet Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("NuGet/Cache"),
+            72,
+            "package",
+        );
+        add_root(
+            &mut roots,
+            "Composer Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("Composer/files"),
+            68,
+            "package",
+        );
+        add_review_root(
+            &mut roots,
+            "PNPM Store",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("pnpm/store"),
+            75,
+            "package",
+            "PNPM store bisa dipakai banyak proyek dan perlu review manual.",
+        );
+        add_review_root(
+            &mut roots,
+            "Bun Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("bun/install/cache"),
+            76,
+            "package",
+            "Bun cache dapat dibuat ulang, tetapi sebagian isi mungkin sedang dipakai.",
+        );
+        add_root(
+            &mut roots,
+            "Playwright Browser Cache",
+            "Dev Cache",
+            "Dev Cache",
+            local.join("ms-playwright"),
+            88,
+            "browser",
+        );
+        add_root(
+            &mut roots,
+            "NVIDIA Shader Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("NVIDIA/DXCache"),
+            68,
+            "gpu",
+        );
+        add_root(
+            &mut roots,
+            "NVIDIA OpenGL Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("NVIDIA/GLCache"),
+            67,
+            "gpu",
+        );
+        add_root(
+            &mut roots,
+            "AMD Shader Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("AMD/DxCache"),
+            67,
+            "gpu",
+        );
+        add_root(
+            &mut roots,
+            "Epic Games Launcher Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("EpicGamesLauncher/Saved/webcache"),
+            63,
+            "game",
+        );
+        add_root(
+            &mut roots,
+            "Steam HTML Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("Steam/htmlcache"),
+            59,
+            "game",
+        );
+        add_root(
+            &mut roots,
+            "Battle.net Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("Battle.net/Cache"),
+            59,
+            "game",
+        );
+        add_root(
+            &mut roots,
+            "Roblox Cache",
+            "Game Cache",
+            "Game Cache",
+            local.join("Roblox/logs"),
+            55,
+            "game",
+        );
     }
     if let Ok(appdata) = env::var("APPDATA") {
         let appdata_root = PathBuf::from(&appdata);
@@ -332,7 +753,15 @@ fn cleanup_roots() -> Vec<ScanRoot> {
             .flatten()
             .filter_map(Result::ok)
         {
-            add_root(&mut roots, "Firefox Cache", "Browser Cache", "Browser Cache", profile.path().join("cache2"), 64, "browser");
+            add_root(
+                &mut roots,
+                "Firefox Cache",
+                "Browser Cache",
+                "Browser Cache",
+                profile.path().join("cache2"),
+                64,
+                "browser",
+            );
             add_root(
                 &mut roots,
                 "Firefox Startup Cache",
@@ -352,21 +781,166 @@ fn cleanup_roots() -> Vec<ScanRoot> {
                 "browser",
             );
         }
-        add_root(&mut roots, "Python PIP Cache", "Dev Cache", "Dev Cache", appdata_root.join("pip/Cache"), 96, "python");
-        add_root(&mut roots, "Cargo Registry (Rust)", "Dev Cache", "Dev Cache", appdata_root.join("cargo/registry"), 90, "rust");
-        add_root(&mut roots, "Cargo Git Cache (Rust)", "Dev Cache", "Dev Cache", appdata_root.join("cargo/git"), 82, "rust");
-        add_root(&mut roots, "Dart/Flutter Pub Cache", "Dev Cache", "Dev Cache", appdata_root.join("Pub/Cache"), 60, "package");
+        add_root(
+            &mut roots,
+            "Python PIP Cache",
+            "Dev Cache",
+            "Dev Cache",
+            appdata_root.join("pip/Cache"),
+            96,
+            "python",
+        );
+        add_root(
+            &mut roots,
+            "Cargo Registry (Rust)",
+            "Dev Cache",
+            "Dev Cache",
+            appdata_root.join("cargo/registry"),
+            90,
+            "rust",
+        );
+        add_root(
+            &mut roots,
+            "Cargo Git Cache (Rust)",
+            "Dev Cache",
+            "Dev Cache",
+            appdata_root.join("cargo/git"),
+            82,
+            "rust",
+        );
+        add_root(
+            &mut roots,
+            "Dart/Flutter Pub Cache",
+            "Dev Cache",
+            "Dev Cache",
+            appdata_root.join("Pub/Cache"),
+            60,
+            "package",
+        );
+        add_root(
+            &mut roots,
+            "Ruby Gems Cache",
+            "Dev Cache",
+            "Dev Cache",
+            appdata_root.join("gem/cache"),
+            58,
+            "package",
+        );
     }
     if let Ok(home) = env::var("USERPROFILE") {
         let home = PathBuf::from(home);
-        add_review_root(&mut roots, "Folder Downloads", "User Files", "User Files", home.join("Downloads"), 70, "download", "Downloads sering berisi data pribadi dan installer yang masih diperlukan.");
-        add_root(&mut roots, "Go Build Cache", "Dev Cache", "Dev Cache", home.join("AppData/Local/go-build"), 58, "go");
-        add_root(&mut roots, "Python PIP Cache", "Dev Cache", "Dev Cache", home.join("AppData/Local/pip/Cache"), 96, "python");
-        add_root(&mut roots, "Cargo Registry (Rust)", "Dev Cache", "Dev Cache", home.join(".cargo/registry"), 90, "rust");
-        add_root(&mut roots, "Cargo Git Cache (Rust)", "Dev Cache", "Dev Cache", home.join(".cargo/git"), 82, "rust");
+        add_review_root(
+            &mut roots,
+            "Folder Downloads",
+            "User Files",
+            "User Files",
+            home.join("Downloads"),
+            70,
+            "download",
+            "Downloads sering berisi data pribadi dan installer yang masih diperlukan.",
+        );
+        add_root(
+            &mut roots,
+            "Go Build Cache",
+            "Dev Cache",
+            "Dev Cache",
+            home.join("AppData/Local/go-build"),
+            58,
+            "go",
+        );
+        add_root(
+            &mut roots,
+            "Python PIP Cache",
+            "Dev Cache",
+            "Dev Cache",
+            home.join("AppData/Local/pip/Cache"),
+            96,
+            "python",
+        );
+        add_root(
+            &mut roots,
+            "Cargo Registry (Rust)",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".cargo/registry"),
+            90,
+            "rust",
+        );
+        add_root(
+            &mut roots,
+            "Cargo Git Cache (Rust)",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".cargo/git"),
+            82,
+            "rust",
+        );
+        add_root(
+            &mut roots,
+            "Gradle Cache",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".gradle/caches"),
+            74,
+            "package",
+        );
+        add_root(
+            &mut roots,
+            "Maven Repository Cache",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".m2/repository"),
+            57,
+            "package",
+        );
+        add_root(
+            &mut roots,
+            "Android Build Cache",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".android/build-cache"),
+            57,
+            "android",
+        );
+        add_root(
+            &mut roots,
+            "Rustup Downloads",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".rustup/downloads"),
+            62,
+            "rust",
+        );
+        add_root(
+            &mut roots,
+            "Rustup Temp",
+            "Dev Cache",
+            "Dev Cache",
+            home.join(".rustup/tmp"),
+            62,
+            "rust",
+        );
     }
-    add_review_root(&mut roots, "Windows CBS Logs", "Windows Logs", "System Cache", PathBuf::from(r"C:\Windows\Logs\CBS"), 45, "logs", "Log servicing Windows berguna saat troubleshooting update.");
-    add_manual_root(&mut roots, "Windows Installer Cache", "System Cache", "System Cache", PathBuf::from(r"C:\Windows\Installer"), 20, "package", "Windows Installer Cache dapat dibutuhkan untuk repair/uninstall aplikasi.");
+    add_review_root(
+        &mut roots,
+        "Windows CBS Logs",
+        "Windows Logs",
+        "System Cache",
+        PathBuf::from(r"C:\Windows\Logs\CBS"),
+        45,
+        "logs",
+        "Log servicing Windows berguna saat troubleshooting update.",
+    );
+    add_manual_root(
+        &mut roots,
+        "Windows Installer Cache",
+        "System Cache",
+        "System Cache",
+        PathBuf::from(r"C:\Windows\Installer"),
+        20,
+        "package",
+        "Windows Installer Cache dapat dibutuhkan untuk repair/uninstall aplikasi.",
+    );
     let mut seen = HashSet::new();
     roots.retain(|root| seen.insert(root.path.to_string_lossy().to_ascii_lowercase()));
     roots
@@ -385,20 +959,28 @@ fn advisory_root(
     if !path.exists() {
         return None;
     }
-    Some(scan_root(
-        name,
-        category,
-        group,
-        normalized_path(&path),
-        DeleteMode::SelfItem,
-        "advisory",
-        if priority < 30 { "high" } else { "medium" },
-        priority,
-        icon,
-        "Advisory",
-        note,
-        recommendation,
-    ))
+    Some(
+        scan_root(
+            name,
+            category,
+            group,
+            normalized_path(&path),
+            DeleteMode::SelfItem,
+            "advisory",
+            if priority < 30 { "high" } else { "medium" },
+            priority,
+            icon,
+            "Advisory",
+            note,
+            recommendation,
+        )
+        .with_metadata(
+            "Audit/advisory",
+            "Known large-space indicator",
+            vec!["advisory", "manual-review"],
+            "Audit only",
+        ),
+    )
 }
 
 fn advisory_roots() -> Vec<ScanRoot> {
@@ -442,6 +1024,68 @@ fn advisory_roots() -> Vec<ScanRoot> {
         "Jika tidak butuh Hibernate/Fast Startup, nonaktifkan dengan powercfg /h off.",
     ) {
         roots.push(root);
+    }
+    if PathBuf::from(r"C:\Windows\Temp").exists() {
+        roots.push(admin_clean_root(
+            "Windows System Temp",
+            "Admin Clean",
+            "Protected System",
+            normalized_path(Path::new(r"C:\Windows\Temp")),
+            31,
+            "shield",
+            "Folder temp sistem dapat berisi file terkunci atau dipakai service.",
+            "Bersihkan hanya setelah review; LeoDisk akan menghapus isi folder saja dan melewati file yang terkunci.",
+        ));
+    }
+    for (name, path, note, recommendation) in [
+        (
+            "Windows Update Download Cache",
+            PathBuf::from(r"C:\Windows\SoftwareDistribution\Download"),
+            "Cache Windows Update berada di area sistem dan biasanya butuh izin admin.",
+            "Gunakan Storage Sense atau Windows Update troubleshooting bila ingin membersihkan area ini.",
+        ),
+        (
+            "Windows Panther Logs",
+            PathBuf::from(r"C:\Windows\Panther"),
+            "Log setup/upgrade Windows bisa membantu troubleshooting.",
+            "Review manual; jangan hapus saat update/upgrade Windows bermasalah.",
+        ),
+        (
+            "Windows Memory Dumps",
+            PathBuf::from(r"C:\Windows\Minidump"),
+            "Crash dump sistem bisa besar dan berguna untuk diagnosa BSOD.",
+            "Hapus lewat Storage Sense setelah tidak dibutuhkan untuk troubleshooting.",
+        ),
+        (
+            "Windows Prefetch",
+            PathBuf::from(r"C:\Windows\Prefetch"),
+            "Prefetch adalah optimasi Windows dan bukan target cleanup otomatis.",
+            "Biarkan Windows mengelola folder ini kecuali ada instruksi troubleshooting khusus.",
+        ),
+        (
+            "ProgramData Package Cache",
+            PathBuf::from(r"C:\ProgramData\Package Cache"),
+            "Cache installer global dapat dibutuhkan repair/uninstall aplikasi.",
+            "Audit ukuran saja; jangan hapus otomatis.",
+        ),
+        (
+            "ProgramData Crash Dumps",
+            PathBuf::from(r"C:\ProgramData\Microsoft\Windows\WER"),
+            "Windows Error Reporting global bisa besar tetapi berada di area sistem.",
+            "Gunakan Windows cleanup tools bila perlu.",
+        ),
+    ] {
+        add_admin_audit_root(
+            &mut roots,
+            name,
+            "Admin Audit",
+            "Protected System",
+            path,
+            26,
+            "shield",
+            note,
+            recommendation,
+        );
     }
     if let Ok(home) = env::var("USERPROFILE") {
         let home = PathBuf::from(home);
@@ -506,7 +1150,7 @@ fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<Cleanup
     let mut items = Vec::new();
     for (root, size_bytes, file_count, skipped_count) in measured {
         let id = opaque_id("clean", &path_display(&root.path));
-        if root.decision == "clean" {
+        if root.decision == "clean" || root.decision == "admin" {
             tracked.insert(
                 id.clone(),
                 TrackedDeletion {
@@ -515,6 +1159,7 @@ fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<Cleanup
                     mode: root.mode,
                     estimated_bytes: size_bytes,
                     clean_allowed: true,
+                    decision: root.decision.clone(),
                 },
             );
         }
@@ -542,6 +1187,10 @@ fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<Cleanup
             safety_label: root.safety_label,
             safety_note: root.safety_note,
             recommendation: root.recommendation,
+            scope: root.scope,
+            detected_by: root.detected_by,
+            detail_tags: root.detail_tags,
+            confidence_label: root.confidence_label,
             advisory: root.advisory,
             checked: true,
             exists: true,
@@ -592,13 +1241,15 @@ pub fn build_report(
     }
     let category_totals = category_map
         .into_iter()
-        .map(|((category, group), (size_bytes, file_count, item_count))| CleanupCategoryTotal {
-            category,
-            group,
-            size_bytes,
-            file_count,
-            item_count,
-        })
+        .map(
+            |((category, group), (size_bytes, file_count, item_count))| CleanupCategoryTotal {
+                category,
+                group,
+                size_bytes,
+                file_count,
+                item_count,
+            },
+        )
         .collect::<Vec<_>>();
     let iter_all = items.iter().chain(advisories.iter()).collect::<Vec<_>>();
     let total_bytes = items.iter().map(|item| item.size_bytes).sum();
@@ -609,7 +1260,10 @@ pub fn build_report(
         total: iter_all.len() as u64,
         found: iter_all.iter().filter(|item| item.exists).count() as u64,
         not_found: iter_all.iter().filter(|item| !item.exists).count() as u64,
-        access_limited: iter_all.iter().filter(|item| item.skipped_count > 0).count() as u64,
+        access_limited: iter_all
+            .iter()
+            .filter(|item| item.skipped_count > 0)
+            .count() as u64,
         skipped: skipped_count,
         advisory_count: advisories.len() as u64,
         total_junk_bytes: total_bytes,
@@ -624,13 +1278,28 @@ pub fn build_report(
             .filter(|item| item.decision == "review")
             .map(|item| item.size_bytes)
             .sum(),
-        review_items: items.iter().filter(|item| item.decision == "review").count() as u64,
+        review_items: items
+            .iter()
+            .filter(|item| item.decision == "review")
+            .count() as u64,
         manual_bytes: items
             .iter()
             .filter(|item| item.decision == "manual")
             .map(|item| item.size_bytes)
             .sum(),
-        manual_items: items.iter().filter(|item| item.decision == "manual").count() as u64,
+        manual_items: items
+            .iter()
+            .filter(|item| item.decision == "manual")
+            .count() as u64,
+        admin_bytes: items
+            .iter()
+            .filter(|item| item.decision == "admin")
+            .map(|item| item.size_bytes)
+            .sum(),
+        admin_items: items
+            .iter()
+            .filter(|item| item.decision == "admin")
+            .count() as u64,
         advisory_bytes: advisories.iter().map(|item| item.size_bytes).sum(),
         advisory_items: advisories.len() as u64,
     };
@@ -689,6 +1358,10 @@ pub fn report_remnant_paths(
                 safety_label: "Periksa dahulu".into(),
                 safety_note: "Folder dapat berisi pengaturan atau data pengguna aplikasi. Hapus hanya setelah aplikasi sudah tidak dibutuhkan.".into(),
                 recommendation: "Buka folder dan pastikan aplikasi terkait sudah tidak dipakai.".into(),
+                scope: "User-level".into(),
+                detected_by: "Installed app remnant match".into(),
+                detail_tags: vec!["app-remnant".into(), "review".into()],
+                confidence_label: "Manual review".into(),
                 advisory: false,
             })
         })
@@ -706,7 +1379,11 @@ pub fn report_review_paths(
             let parent = path.parent()?.to_path_buf();
             Some(ScanRoot {
                 name: category.clone(),
-                kind: if path.is_file() { "file".into() } else { "folder".into() },
+                kind: if path.is_file() {
+                    "file".into()
+                } else {
+                    "folder".into()
+                },
                 category: category.clone(),
                 group: "Review".into(),
                 path,
@@ -720,6 +1397,10 @@ pub fn report_review_paths(
                 safety_label: "Periksa dahulu".into(),
                 safety_note,
                 recommendation: "Review manual sebelum menghapus.".into(),
+                scope: "User-level".into(),
+                detected_by: "User-selected scan".into(),
+                detail_tags: vec!["review".into()],
+                confidence_label: "Manual review".into(),
                 advisory: false,
             })
         })
@@ -753,13 +1434,25 @@ fn remove_one(path: &Path, permanent: bool) -> bool {
     }
 }
 
+fn admin_delete_confirmed(admin_confirmed: Option<bool>, phrase: Option<&str>) -> bool {
+    admin_confirmed.unwrap_or(false)
+        && phrase
+            .map(str::trim)
+            .is_some_and(|phrase| phrase == ADMIN_CONFIRMATION_PHRASE)
+}
+
 fn last_report(state: &AppState) -> ApiResult<CleanupReport> {
     state
         .last_cleanup_report
         .lock()
         .map_err(|_| ApiError::new("REPORT_LOCK", "Report cleanup tidak tersedia."))?
         .clone()
-        .ok_or_else(|| ApiError::new("REPORT_NOT_FOUND", "Jalankan scan deep cleanup terlebih dahulu."))
+        .ok_or_else(|| {
+            ApiError::new(
+                "REPORT_NOT_FOUND",
+                "Jalankan scan deep cleanup terlebih dahulu.",
+            )
+        })
 }
 
 fn export_dir() -> ApiResult<PathBuf> {
@@ -874,6 +1567,8 @@ pub fn export_cleanup_detail(state: tauri::State<'_, AppState>) -> ApiResult<Act
 pub fn delete_cleanup_items(
     item_ids: Vec<String>,
     permanent: bool,
+    admin_confirmed: Option<bool>,
+    admin_confirmation_phrase: Option<String>,
     state: tauri::State<'_, AppState>,
 ) -> ApiResult<ActionReport> {
     let unique: HashSet<String> = item_ids.into_iter().collect();
@@ -896,8 +1591,14 @@ pub fn delete_cleanup_items(
     let mut affected = 0;
     let mut skipped = 0;
     let mut reclaimed = 0;
+    let admin_allowed =
+        admin_delete_confirmed(admin_confirmed, admin_confirmation_phrase.as_deref());
     for item in selected.values() {
         if !item.clean_allowed {
+            skipped += 1;
+            continue;
+        }
+        if item.decision == "admin" && !admin_allowed {
             skipped += 1;
             continue;
         }
@@ -1001,40 +1702,51 @@ mod tests {
             mode: DeleteMode::SelfItem,
             estimated_bytes: 0,
             clean_allowed: true,
+            decision: "clean".into(),
         };
         assert!(!valid_tracked_item(&item));
     }
 
     #[test]
     fn report_sums_items_and_preserves_safety() {
-        let report = build_report(vec![CleanupItem {
-            id: "a".into(),
-            name: "Cache".into(),
-            kind: "folder".into(),
-            category: "Cache".into(),
-            group: "System Cache".into(),
-            path: "test".into(),
-            size_bytes: 32,
-            file_count: 2,
-            skipped_count: 1,
-            safe_to_delete: true,
-            risk_level: "low".into(),
-            decision: "clean".into(),
-            status: "ready".into(),
-            priority: 1,
-            icon: "cache".into(),
-            safety_label: "Aman dihapus".into(),
-            safety_note: "Cache".into(),
-            recommendation: "Clean".into(),
-            advisory: false,
-            checked: true,
-            exists: true,
-            last_scanned_at: "1".into(),
-            blocked_reason: None,
-        }], "1".into(), "2".into(), 1);
+        let report = build_report(
+            vec![CleanupItem {
+                id: "a".into(),
+                name: "Cache".into(),
+                kind: "folder".into(),
+                category: "Cache".into(),
+                group: "System Cache".into(),
+                path: "test".into(),
+                size_bytes: 32,
+                file_count: 2,
+                skipped_count: 1,
+                safe_to_delete: true,
+                risk_level: "low".into(),
+                decision: "clean".into(),
+                status: "ready".into(),
+                priority: 1,
+                icon: "cache".into(),
+                safety_label: "Aman dihapus".into(),
+                safety_note: "Cache".into(),
+                recommendation: "Clean".into(),
+                scope: "User-level".into(),
+                detected_by: "test".into(),
+                detail_tags: vec!["cache".into()],
+                confidence_label: "High confidence".into(),
+                advisory: false,
+                checked: true,
+                exists: true,
+                last_scanned_at: "1".into(),
+                blocked_reason: None,
+            }],
+            "1".into(),
+            "2".into(),
+            1,
+        );
         assert_eq!(report.total_bytes, 32);
         assert_eq!(report.total_files, 2);
         assert!(report.items[0].safe_to_delete);
+        assert_eq!(report.items[0].scope, "User-level");
     }
 
     #[test]
@@ -1067,5 +1779,51 @@ mod tests {
         assert!(root.safe_to_delete);
         assert!(matches!(root.mode, DeleteMode::Children));
         assert_eq!(root.validation_root, root.path);
+    }
+
+    #[test]
+    fn admin_audit_roots_are_never_cleanable() {
+        let root = admin_audit_root(
+            "Windows Update Download Cache",
+            "Admin Audit",
+            "Protected System",
+            PathBuf::from(r"C:\Windows\SoftwareDistribution\Download"),
+            1,
+            "shield",
+            "Protected",
+            "Use Windows cleanup tools.",
+        );
+        assert!(!root.safe_to_delete);
+        assert_eq!(root.decision, "advisory");
+        assert_eq!(root.scope, "Admin/system audit");
+        assert!(root.detail_tags.iter().any(|tag| tag == "audit-only"));
+    }
+
+    #[test]
+    fn admin_clean_root_deletes_children_only_after_confirmation() {
+        let root = admin_clean_root(
+            "Windows System Temp",
+            "Admin Clean",
+            "Protected System",
+            PathBuf::from(r"C:\Windows\Temp"),
+            1,
+            "shield",
+            "Protected",
+            "Delete children only.",
+        );
+        assert!(!root.safe_to_delete);
+        assert_eq!(root.decision, "admin");
+        assert!(matches!(root.mode, DeleteMode::Children));
+        assert_eq!(root.validation_root, root.path);
+        assert!(root
+            .detail_tags
+            .iter()
+            .any(|tag| tag == "confirmation-required"));
+        assert!(!admin_delete_confirmed(Some(true), Some("SALAH")));
+        assert!(!admin_delete_confirmed(Some(false), Some(ADMIN_CONFIRMATION_PHRASE)));
+        assert!(admin_delete_confirmed(
+            Some(true),
+            Some(ADMIN_CONFIRMATION_PHRASE)
+        ));
     }
 }
