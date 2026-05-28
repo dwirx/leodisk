@@ -72,23 +72,74 @@ pub struct SystemSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct CleanupItem {
     pub id: String,
+    pub name: String,
+    pub kind: String,
     pub category: String,
+    pub group: String,
     pub path: String,
     pub size_bytes: u64,
     pub file_count: u64,
     pub skipped_count: u64,
     pub safe_to_delete: bool,
+    pub risk_level: String,
+    pub decision: String,
+    pub status: String,
+    pub priority: u32,
+    pub icon: String,
     pub safety_label: String,
     pub safety_note: String,
+    pub recommendation: String,
+    pub advisory: bool,
+    pub checked: bool,
+    pub exists: bool,
+    pub last_scanned_at: String,
+    pub blocked_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CleanupReport {
     pub items: Vec<CleanupItem>,
+    pub advisories: Vec<CleanupItem>,
+    pub summary: CleanupReportSummary,
+    pub category_totals: Vec<CleanupCategoryTotal>,
     pub total_bytes: u64,
     pub total_files: u64,
     pub skipped_count: u64,
+    pub scan_started_at: String,
+    pub scan_finished_at: String,
+    pub duration_ms: u128,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupReportSummary {
+    pub checked: u64,
+    pub total: u64,
+    pub found: u64,
+    pub not_found: u64,
+    pub access_limited: u64,
+    pub skipped: u64,
+    pub advisory_count: u64,
+    pub total_junk_bytes: u64,
+    pub cleanable_bytes: u64,
+    pub cleanable_items: u64,
+    pub review_bytes: u64,
+    pub review_items: u64,
+    pub manual_bytes: u64,
+    pub manual_items: u64,
+    pub advisory_bytes: u64,
+    pub advisory_items: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupCategoryTotal {
+    pub category: String,
+    pub group: String,
+    pub size_bytes: u64,
+    pub file_count: u64,
+    pub item_count: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -538,6 +538,7 @@ fn scan(
                         validation_root: root.clone(),
                         mode: DeleteMode::SelfItem,
                         estimated_bytes: size,
+                        clean_allowed: true,
                     },
                 ));
             }

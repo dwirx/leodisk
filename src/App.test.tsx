@@ -17,6 +17,9 @@ vi.mock("@tauri-apps/api/event", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn().mockResolvedValue(null),
 }));
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openPath: vi.fn().mockResolvedValue(undefined),
+}));
 
 afterEach(cleanup);
 
@@ -39,7 +42,7 @@ beforeEach(() => {
         processes: [],
       });
     }
-    if (command === "scan_cleanup") {
+    if (command === "scan_cleanup" || command === "scan_deep_cleanup") {
       return Promise.resolve({
         items: [{
           id: "cache-1",
@@ -54,6 +57,42 @@ beforeEach(() => {
         }],
         totalBytes: 1024,
         totalFiles: 2,
+        skippedCount: 0,
+      });
+    }
+    if (command === "scan_project_artifacts") {
+      return Promise.resolve({
+        items: [{
+          id: "purge-node-modules",
+          category: "JS dependencies",
+          path: "C:\\Projects\\demo\\node_modules",
+          sizeBytes: 4096,
+          fileCount: 12,
+          skippedCount: 0,
+          safeToDelete: false,
+          safetyLabel: "Periksa dahulu",
+          safetyNote: "Artefak proyek dapat dibuat ulang",
+        }],
+        totalBytes: 4096,
+        totalFiles: 12,
+        skippedCount: 0,
+      });
+    }
+    if (command === "scan_installers") {
+      return Promise.resolve({
+        items: [{
+          id: "purge-installer",
+          category: "Installer Windows",
+          path: "C:\\Users\\demo\\Downloads\\setup.msi",
+          sizeBytes: 20_000_000,
+          fileCount: 1,
+          skippedCount: 0,
+          safeToDelete: false,
+          safetyLabel: "Periksa dahulu",
+          safetyNote: "File installer besar",
+        }],
+        totalBytes: 20_000_000,
+        totalFiles: 1,
         skippedCount: 0,
       });
     }
@@ -148,20 +187,44 @@ describe("LeoDisk", () => {
   it("berpindah ke tab Bersihkan dan memilih hasil pemindaian", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Bersihkan" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindai sekarang" }));
-    await waitFor(() => expect(screen.getByText("Cache Edge")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Pindai Deep Cleanup" }));
+    await waitFor(() => expect(screen.getAllByText("Cache Edge").length).toBeGreaterThan(0));
     expect(screen.getByText(/Aman dihapus/)).toBeInTheDocument();
-    expect(screen.getByText("1 lokasi dipilih")).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith("scan_cleanup");
-    fireEvent.click(screen.getByRole("button", { name: "Buka lokasi" }));
+    expect(screen.getByText(/1 clean dipilih/)).toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("scan_deep_cleanup");
+    fireEvent.click(screen.getAllByRole("button", { name: "Buka Folder" })[0]);
     expect(invoke).toHaveBeenCalledWith("open_scanned_location", { itemId: "cache-1" });
+  });
+
+  it("menampilkan tab Purge dan tidak memilih hasil secara otomatis", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Purge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan artefak" }));
+    await waitFor(() => expect(screen.getByText("JS dependencies")).toBeInTheDocument());
+    expect(screen.getByText("0 dipilih")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Pilih JS dependencies" })).not.toBeChecked();
+    expect(invoke).toHaveBeenCalledWith("scan_project_artifacts", { paths: undefined });
+  });
+
+  it("scan installer dari tab Purge dan menghapus pilihan lewat cleanup backend", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Purge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan installer" }));
+    await waitFor(() => expect(screen.getByText("Installer Windows")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Pilih Installer Windows" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hapus item dipilih" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ke Recycle Bin" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("delete_cleanup_items", {
+      itemIds: ["purge-installer"],
+      permanent: false,
+    }));
   });
 
   it("meminta konfirmasi sebelum hapus permanen", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Bersihkan" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindai sekarang" }));
-    await waitFor(() => expect(screen.getByText("Cache Edge")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Pindai Deep Cleanup" }));
+    await waitFor(() => expect(screen.getAllByText("Cache Edge").length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: "Hapus item terpilih" }));
     expect(screen.getByRole("dialog", { name: "Bersihkan item terpilih?" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hapus permanen" }));
@@ -225,7 +288,7 @@ describe("LeoDisk", () => {
           processes: [],
         });
       }
-      if (command === "scan_cleanup") {
+      if (command === "scan_cleanup" || command === "scan_deep_cleanup") {
         return Promise.resolve({
           items: [
             {
@@ -260,9 +323,9 @@ describe("LeoDisk", () => {
     });
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Bersihkan" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindai sekarang" }));
-    await waitFor(() => expect(screen.getByText("Data perlu diperiksa")).toBeInTheDocument());
-    expect(screen.getByText("1 lokasi dipilih")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pindai Deep Cleanup" }));
+    await waitFor(() => expect(screen.getAllByText("Data perlu diperiksa").length).toBeGreaterThan(0));
+    expect(screen.getByText(/1 clean dipilih/)).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Pilih Cache aman" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Pilih Data perlu diperiksa" })).not.toBeChecked();
   });

@@ -1,4 +1,4 @@
-export type Tab = "clean" | "apps" | "optimize" | "analyze" | "performance" | "status";
+export type Tab = "clean" | "purge" | "apps" | "optimize" | "analyze" | "performance" | "status";
 
 export interface ApiError {
   code: string;
@@ -47,21 +47,68 @@ export interface SystemSnapshot {
 
 export interface CleanupItem {
   id: string;
+  name?: string;
+  kind?: string;
   category: string;
+  group?: string;
   path: string;
   sizeBytes: number;
   fileCount: number;
   skippedCount: number;
   safeToDelete: boolean;
+  riskLevel?: "low" | "medium" | "high";
+  decision?: "clean" | "review" | "manual" | "advisory";
+  status?: "ready" | "review" | "manual" | "notFound" | "blocked";
+  priority?: number;
+  icon?: string;
   safetyLabel: string;
   safetyNote: string;
+  recommendation?: string;
+  advisory?: boolean;
+  checked?: boolean;
+  exists?: boolean;
+  lastScannedAt?: string;
+  blockedReason?: string | null;
+}
+
+export interface CleanupReportSummary {
+  checked: number;
+  total: number;
+  found: number;
+  notFound: number;
+  accessLimited: number;
+  skipped: number;
+  advisoryCount: number;
+  totalJunkBytes: number;
+  cleanableBytes: number;
+  cleanableItems: number;
+  reviewBytes: number;
+  reviewItems: number;
+  manualBytes: number;
+  manualItems: number;
+  advisoryBytes: number;
+  advisoryItems: number;
+}
+
+export interface CleanupCategoryTotal {
+  category: string;
+  group: string;
+  sizeBytes: number;
+  fileCount: number;
+  itemCount: number;
 }
 
 export interface CleanupReport {
   items: CleanupItem[];
+  advisories?: CleanupItem[];
+  summary?: CleanupReportSummary;
+  categoryTotals?: CleanupCategoryTotal[];
   totalBytes: number;
   totalFiles: number;
   skippedCount: number;
+  scanStartedAt?: string;
+  scanFinishedAt?: string;
+  durationMs?: number;
 }
 
 export interface InstalledApp {
@@ -96,6 +143,7 @@ export interface ScanJob {
 
 export interface DiskFolder {
   locationId: string;
+  nodeId?: string;
   name: string;
   path: string;
   sizeBytes: number;
