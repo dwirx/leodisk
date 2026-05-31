@@ -192,6 +192,7 @@ pub struct DiskFolder {
     pub location_id: String,
     pub name: String,
     pub path: String,
+    pub parent_path: String,
     pub size_bytes: u64,
     pub file_count: u64,
 }
@@ -249,6 +250,7 @@ pub struct DiskScanResult {
     pub file_count: u64,
     pub inaccessible: u64,
     pub folders: Vec<DiskFolder>,
+    pub all_folders: Vec<DiskFolder>,
     pub categories: Vec<DiskCategory>,
     pub largest_files: Vec<LargeFile>,
 }

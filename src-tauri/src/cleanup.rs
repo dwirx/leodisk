@@ -20,7 +20,7 @@ use crate::{
 };
 
 const ADMIN_CONFIRMATION_PHRASE: &str = "SAYA MENGERTI";
-
+const CLEANUP_FOLDER_EXPANSION_DEPTH: usize = 3;
 #[derive(Clone)]
 struct ScanRoot {
     name: String,
@@ -43,6 +43,7 @@ struct ScanRoot {
     detail_tags: Vec<String>,
     confidence_label: String,
     advisory: bool,
+    expand_children: bool,
 }
 
 impl ScanRoot {
@@ -118,6 +119,7 @@ fn scan_root(
             "Manual review".into()
         },
         advisory: decision == "advisory",
+        expand_children: false,
     }
 }
 
@@ -129,7 +131,7 @@ fn safe_root(
     priority: u32,
     icon: &str,
 ) -> ScanRoot {
-    scan_root(
+    let mut root = scan_root(
         name,
         category,
         group,
@@ -142,7 +144,9 @@ fn safe_root(
         "Aman dihapus",
         "Folder aman, bisa dibaca penuh, dan siap dibersihkan sekarang.",
         "Cache sementara dapat dibuat ulang oleh Windows atau aplikasi.",
-    )
+    );
+    root.expand_children = true;
+    root
 }
 
 fn safe_self_root(category: &str, path: PathBuf) -> Option<ScanRoot> {
@@ -170,6 +174,7 @@ fn safe_self_root(category: &str, path: PathBuf) -> Option<ScanRoot> {
         detail_tags: vec![category.into(), "file-cache".into()],
         confidence_label: "High confidence".into(),
         advisory: false,
+        expand_children: false,
     })
 }
 
@@ -325,7 +330,7 @@ fn admin_clean_root(
     note: &str,
     recommendation: &str,
 ) -> ScanRoot {
-    scan_root(
+    let mut root = scan_root(
         name,
         category,
         group,
@@ -338,8 +343,9 @@ fn admin_clean_root(
         "Butuh konfirmasi admin",
         note,
         recommendation,
-    )
-    .with_metadata(
+    );
+    root.expand_children = true;
+    root.with_metadata(
         "Admin/system clean",
         "Protected Windows path",
         vec!["admin", "system", "confirmation-required"],
@@ -1128,16 +1134,137 @@ pub fn measure_path(path: &Path) -> (u64, u64, u64) {
     (size, files, skipped)
 }
 
+struct MeasuredRoot {
+    root: ScanRoot,
+    size_bytes: u64,
+    file_count: u64,
+    skipped_count: u64,
+}
+
+fn folder_child_root(parent: &ScanRoot, path: PathBuf, depth: usize) -> ScanRoot {
+    let name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| parent.name.clone());
+    let mut detail_tags = parent.detail_tags.clone();
+    detail_tags.push(format!("folder-depth-{depth}"));
+    ScanRoot {
+        name,
+        kind: "folder".into(),
+        category: parent.category.clone(),
+        group: parent.group.clone(),
+        path,
+        mode: DeleteMode::SelfItem,
+        validation_root: parent.path.clone(),
+        safe_to_delete: parent.safe_to_delete,
+        risk_level: parent.risk_level.clone(),
+        decision: parent.decision.clone(),
+        priority: parent.priority,
+        icon: parent.icon.clone(),
+        safety_label: parent.safety_label.clone(),
+        safety_note: format!(
+            "{} Folder turunan dari {}.",
+            parent.safety_note, parent.name
+        ),
+        recommendation: parent.recommendation.clone(),
+        scope: parent.scope.clone(),
+        detected_by: format!("{} folder map", parent.detected_by),
+        detail_tags,
+        confidence_label: parent.confidence_label.clone(),
+        advisory: parent.advisory,
+        expand_children: false,
+    }
+}
+
+fn collect_child_folders(
+    parent: &ScanRoot,
+    current: &Path,
+    depth: usize,
+    output: &mut Vec<ScanRoot>,
+) {
+    if depth == 0 {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(current) else {
+        return;
+    };
+    let mut folder_children = Vec::new();
+    for entry in entries.filter_map(Result::ok) {
+        let path = normalized_path(&entry.path());
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            continue;
+        }
+        folder_children.push(path);
+    }
+    for path in folder_children {
+        let before = output.len();
+        collect_child_folders(parent, &path, depth - 1, output);
+        if output.len() == before {
+            output.push(folder_child_root(parent, path, depth));
+        }
+    }
+}
+
+fn measure_scan_root(root: ScanRoot) -> Vec<MeasuredRoot> {
+    if root.expand_children && root.path.is_dir() {
+        let mut child_folders = Vec::new();
+        collect_child_folders(
+            &root,
+            &root.path,
+            CLEANUP_FOLDER_EXPANSION_DEPTH,
+            &mut child_folders,
+        );
+        let measured_children = child_folders
+            .into_iter()
+            .filter_map(|child| {
+                let (size_bytes, file_count, skipped_count) = measure_path(&child.path);
+                (file_count > 0 || skipped_count > 0).then_some(MeasuredRoot {
+                    root: child,
+                    size_bytes,
+                    file_count,
+                    skipped_count,
+                })
+            })
+            .collect::<Vec<_>>();
+        if !measured_children.is_empty() {
+            return measured_children;
+        }
+    }
+    let (size_bytes, file_count, skipped_count) = measure_path(&root.path);
+    (file_count > 0 || skipped_count > 0)
+        .then_some(MeasuredRoot {
+            root,
+            size_bytes,
+            file_count,
+            skipped_count,
+        })
+        .into_iter()
+        .collect()
+}
+
+fn dedupe_roots(roots: Vec<ScanRoot>) -> Vec<ScanRoot> {
+    let mut seen = HashSet::new();
+    roots
+        .into_iter()
+        .filter(|root| {
+            let key = path_display(&normalized_path(&root.path)).to_lowercase();
+            seen.insert(key)
+        })
+        .collect()
+}
+
 fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<CleanupReport> {
     let started = timestamp();
     let timer = Instant::now();
-    let measured: Vec<(ScanRoot, u64, u64, u64)> = roots
+    let measured: Vec<MeasuredRoot> = dedupe_roots(roots)
         .into_par_iter()
-        .map(|root| {
-            let (size, files, skipped) = measure_path(&root.path);
-            (root, size, files, skipped)
-        })
-        .filter(|(_, _, files, skipped)| *files > 0 || *skipped > 0)
+        .map(measure_scan_root)
+        .flatten()
         .collect();
     let mut tracked = state
         .deletion_items
@@ -1148,7 +1275,13 @@ fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<Cleanup
         .lock()
         .map_err(|_| ApiError::new("LOCATION_LOCK", "Lokasi hasil pemindaian tidak tersedia."))?;
     let mut items = Vec::new();
-    for (root, size_bytes, file_count, skipped_count) in measured {
+    for MeasuredRoot {
+        root,
+        size_bytes,
+        file_count,
+        skipped_count,
+    } in measured
+    {
         let id = opaque_id("clean", &path_display(&root.path));
         if root.decision == "clean" || root.decision == "admin" {
             tracked.insert(
@@ -1296,10 +1429,7 @@ pub fn build_report(
             .filter(|item| item.decision == "admin")
             .map(|item| item.size_bytes)
             .sum(),
-        admin_items: items
-            .iter()
-            .filter(|item| item.decision == "admin")
-            .count() as u64,
+        admin_items: items.iter().filter(|item| item.decision == "admin").count() as u64,
         advisory_bytes: advisories.iter().map(|item| item.size_bytes).sum(),
         advisory_items: advisories.len() as u64,
     };
@@ -1363,6 +1493,7 @@ pub fn report_remnant_paths(
                 detail_tags: vec!["app-remnant".into(), "review".into()],
                 confidence_label: "Manual review".into(),
                 advisory: false,
+                expand_children: false,
             })
         })
         .collect();
@@ -1402,6 +1533,7 @@ pub fn report_review_paths(
                 detail_tags: vec!["review".into()],
                 confidence_label: "Manual review".into(),
                 advisory: false,
+                expand_children: false,
             })
         })
         .collect();
@@ -1767,6 +1899,50 @@ mod tests {
     }
 
     #[test]
+    fn expanded_roots_report_folder_children_as_delete_targets() {
+        let test_dir = env::temp_dir().join(opaque_id("leodisk-test", "expanded-cleanup"));
+        let child_dir = test_dir.join("nested-cache");
+        let grandchild_dir = child_dir.join("deeper-cache");
+        fs::create_dir_all(&grandchild_dir).expect("create nested cache");
+        fs::write(test_dir.join("one.tmp"), b"cache").expect("write temp file");
+        fs::write(child_dir.join("two.tmp"), b"cache-cache").expect("write nested temp file");
+        fs::write(grandchild_dir.join("three.tmp"), b"cache-cache-cache")
+            .expect("write deeper temp file");
+
+        let state = AppState::default();
+        let report = report_for_roots(
+            vec![safe_root(
+                "User Temp",
+                "System Cache",
+                "System Cache",
+                test_dir.clone(),
+                1,
+                "temp",
+            )],
+            &state,
+        )
+        .expect("report expanded root");
+
+        assert_eq!(report.items.len(), 1);
+        assert!(!report.items.iter().any(|item| item.name == "one.tmp"));
+        assert!(report.items.iter().any(|item| item.name == "deeper-cache"));
+        assert!(!report
+            .items
+            .iter()
+            .any(|item| item.path == path_display(&test_dir)));
+        let tracked = state.deletion_items.lock().expect("tracked items");
+        assert_eq!(tracked.len(), 1);
+        assert!(tracked
+            .values()
+            .all(|item| matches!(item.mode, DeleteMode::SelfItem)));
+        assert!(tracked
+            .values()
+            .all(|item| item.validation_root == normalized_path(&test_dir)));
+
+        fs::remove_dir_all(test_dir).expect("cleanup test dir");
+    }
+
+    #[test]
     fn temp_roots_delete_children_not_the_temp_folder() {
         let root = safe_root(
             "File sementara pengguna",
@@ -1820,7 +1996,10 @@ mod tests {
             .iter()
             .any(|tag| tag == "confirmation-required"));
         assert!(!admin_delete_confirmed(Some(true), Some("SALAH")));
-        assert!(!admin_delete_confirmed(Some(false), Some(ADMIN_CONFIRMATION_PHRASE)));
+        assert!(!admin_delete_confirmed(
+            Some(false),
+            Some(ADMIN_CONFIRMATION_PHRASE)
+        ));
         assert!(admin_delete_confirmed(
             Some(true),
             Some(ADMIN_CONFIRMATION_PHRASE)

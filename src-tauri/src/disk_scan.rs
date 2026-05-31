@@ -81,25 +81,25 @@ struct CategoryTotal {
 }
 
 struct BranchResult {
-    name: String,
     path: PathBuf,
     size_bytes: u64,
     file_count: u64,
     inaccessible: u64,
     categories: [CategoryTotal; CATEGORY_COUNT],
     large_files: Vec<(PathBuf, u64)>,
+    folders: Vec<(PathBuf, u64, u64)>,
 }
 
 impl BranchResult {
-    fn new(name: String, path: PathBuf) -> Self {
+    fn new(path: PathBuf) -> Self {
         Self {
-            name,
             path,
             size_bytes: 0,
             file_count: 0,
             inaccessible: 0,
             categories: std::array::from_fn(|_| CategoryTotal::default()),
             large_files: Vec::new(),
+            folders: Vec::new(),
         }
     }
 }
@@ -285,6 +285,8 @@ fn walk_directory(
     if cancelled.load(Ordering::Relaxed) {
         return;
     }
+    let start_size = result.size_bytes;
+    let start_files = result.file_count;
     let entries = match read_native_entries(directory) {
         Ok(entries) => entries,
         Err(_) => {
@@ -316,6 +318,13 @@ fn walk_directory(
             );
         }
     }
+    let size_bytes = result.size_bytes.saturating_sub(start_size);
+    let file_count = result.file_count.saturating_sub(start_files);
+    if file_count > 0 {
+        result
+            .folders
+            .push((normalized_path(directory), size_bytes, file_count));
+    }
 }
 
 fn scan_branch(
@@ -326,21 +335,12 @@ fn scan_branch(
     app: &tauri::AppHandle,
     job_id: &str,
 ) -> BranchResult {
-    let name = if entry.is_dir {
-        entry
-            .path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "Folder".into())
-    } else {
-        "Berkas di root".into()
-    };
     let folder_path = if entry.is_dir {
         entry.path.clone()
     } else {
         root.to_path_buf()
     };
-    let mut result = BranchResult::new(name, folder_path);
+    let mut result = BranchResult::new(folder_path);
     if entry.reparse {
         result.inaccessible = 1;
         counters.inaccessible.fetch_add(1, Ordering::Relaxed);
@@ -400,6 +400,16 @@ fn location_breadcrumb(path: &Path, locations: &mut HashMap<String, PathBuf>) ->
             .unwrap_or_else(|| display.clone()),
         path: display,
     }
+}
+
+fn folder_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path_display(path))
+}
+
+fn parent_display(path: &Path) -> String {
+    path.parent().map(path_display).unwrap_or_default()
 }
 
 fn scan(
@@ -473,10 +483,10 @@ fn scan(
         return;
     }
 
-    let mut folders: HashMap<String, DiskFolder> = HashMap::new();
     let mut category_totals: [CategoryTotal; CATEGORY_COUNT] =
         std::array::from_fn(|_| CategoryTotal::default());
     let mut large_file_candidates = Vec::new();
+    let mut all_folder_candidates = Vec::new();
     let (root_location_id, breadcrumbs, parent_location) = if let Ok(mut locations) =
         known_locations.lock()
     {
@@ -503,19 +513,14 @@ fn scan(
                 category_totals[index].file_count += category.file_count;
             }
             if branch.file_count > 0 || branch.inaccessible > 0 {
-                let location_id = opaque_id("location", &path_display(&branch.path));
-                locations.insert(location_id.clone(), branch.path.clone());
-                let folder = folders
-                    .entry(path_display(&branch.path))
-                    .or_insert_with(|| DiskFolder {
-                        location_id,
-                        name: branch.name,
-                        path: path_display(&branch.path),
-                        size_bytes: 0,
-                        file_count: 0,
-                    });
-                folder.size_bytes += branch.size_bytes;
-                folder.file_count += branch.file_count;
+                all_folder_candidates.push((
+                    branch.path.clone(),
+                    branch.size_bytes,
+                    branch.file_count,
+                ));
+            }
+            for (path, size_bytes, file_count) in branch.folders {
+                all_folder_candidates.push((path, size_bytes, file_count));
             }
             for (path, size) in branch.large_files {
                 let item_id = opaque_id("disk", &path_display(&path));
@@ -560,7 +565,45 @@ fn scan(
     if let Ok(mut tracked) = deletion_items.lock() {
         tracked.extend(tracked_files);
     }
-    let mut folders: Vec<DiskFolder> = folders.into_values().collect();
+    let mut folder_totals: HashMap<String, (PathBuf, u64, u64)> = HashMap::new();
+    for (path, size_bytes, file_count) in all_folder_candidates {
+        let key = path_display(&normalized_path(&path)).to_lowercase();
+        let entry = folder_totals
+            .entry(key)
+            .or_insert_with(|| (normalized_path(&path), 0, 0));
+        entry.1 = entry.1.max(size_bytes);
+        entry.2 = entry.2.max(file_count);
+    }
+    let mut all_folders = if let Ok(mut locations) = known_locations.lock() {
+        folder_totals
+            .into_values()
+            .map(|(path, size_bytes, file_count)| {
+                let location_id = opaque_id("location", &path_display(&path));
+                locations.insert(location_id.clone(), path.clone());
+                DiskFolder {
+                    location_id,
+                    name: folder_name(&path),
+                    parent_path: parent_display(&path),
+                    path: path_display(&path),
+                    size_bytes,
+                    file_count,
+                }
+            })
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    all_folders.sort_by(|a, b| {
+        b.size_bytes
+            .cmp(&a.size_bytes)
+            .then_with(|| a.path.cmp(&b.path))
+    });
+    let root_display = path_display(&root);
+    let mut folders = all_folders
+        .iter()
+        .filter(|folder| folder.parent_path.eq_ignore_ascii_case(&root_display))
+        .cloned()
+        .collect::<Vec<_>>();
     folders.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
     folders.truncate(FOLDER_RESULT_LIMIT);
     let categories = CATEGORY_INFO
@@ -586,6 +629,7 @@ fn scan(
             file_count: counters.files.load(Ordering::Relaxed),
             inaccessible: counters.inaccessible.load(Ordering::Relaxed),
             folders,
+            all_folders,
             categories,
             largest_files,
         },

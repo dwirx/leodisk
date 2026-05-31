@@ -1484,15 +1484,16 @@ button.dragging {
   height: min(66vh, 670px);
   min-height: 490px;
   display: grid;
-  grid-template-columns: 245px minmax(0, 1fr);
+  grid-template-columns: minmax(270px, 320px) minmax(0, 1fr);
   gap: 22px;
 }
 
 .disk-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
   overflow: auto;
+  padding-right: 4px;
 }
 
 .disk-orb {
@@ -1521,12 +1522,14 @@ button.dragging {
 }
 
 .folder-item {
-  min-height: 54px;
+  min-height: 58px;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 3px;
-  border-radius: 10px;
+  gap: 8px;
+  border: 1px solid rgba(236, 222, 190, 0.06);
+  border-radius: 8px;
+  background: rgba(236, 222, 190, 0.025);
 }
 
 .folder-item:hover {
@@ -1534,17 +1537,18 @@ button.dragging {
 }
 
 .folder-item > button:first-child {
-  padding: 9px 9px;
+  min-width: 0;
+  padding: 10px 11px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   align-items: flex-start;
   background: transparent;
   overflow: hidden;
 }
 
 .folder-item strong {
-  max-width: 155px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1556,8 +1560,8 @@ button.dragging {
 }
 
 .folder-item .reveal {
-  margin-right: 5px;
-  padding: 8px;
+  margin-right: 7px;
+  padding: 8px 9px;
   border-radius: 7px;
   color: var(--blue);
   background: transparent;
@@ -1581,8 +1585,8 @@ button.dragging {
 
 .map-header {
   height: 48px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   color: var(--muted);
@@ -1607,16 +1611,16 @@ button.dragging {
 
 .tile {
   position: absolute;
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
   border: 3px solid var(--bg);
   color: var(--text);
   font: 13px var(--mono);
-  text-align: center;
+  text-align: left;
   overflow: hidden;
 }
 
@@ -1624,6 +1628,7 @@ button.dragging {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tile-0 {

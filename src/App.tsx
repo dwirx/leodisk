@@ -552,10 +552,10 @@ function cleaningMethod(item: CleanupItem) {
   if (source.includes("\\windows\\temp") || source.includes("windows temp")) return "Disk Cleanup > Temporary files";
   if (source.includes("browser") || source.includes("chrome") || source.includes("edge") || source.includes("firefox")) return "Tutup browser > bersihkan dari LeoDisk atau pengaturan browser";
   if (decisionOf(item) === "clean") return "Tambahkan ke Batch Clean";
-  if (decisionOf(item) === "admin") return `Review folder > Izinkan Admin Clean > ketik ${ADMIN_CONFIRMATION_PHRASE}`;
+  if (decisionOf(item) === "admin") return `Review item > Izinkan Admin Clean > ketik ${ADMIN_CONFIRMATION_PHRASE}`;
   if (decisionOf(item) === "manual") return "Buka lokasi > review manual";
   if (decisionOf(item) === "advisory") return "Audit ukuran > gunakan Settings/alat resmi Windows";
-  return "Buka folder > pastikan tidak dipakai > review manual";
+  return "Buka lokasi > pastikan tidak dipakai > review manual";
 }
 
 function preflightStatus(item: CleanupItem) {
@@ -1060,7 +1060,7 @@ function CleanPage({
       <div className="page-title">
         <div>
           <h1>Deep Cleanup Report</h1>
-          <p>{report ? statusText(report) : "Scan cache, dev artifact, advisory disk hog, dan target manual dalam satu laporan audit."}</p>
+          <p>{report ? statusText(report) : "Scan folder cache, folder sampah, dev artifact, advisory disk hog, dan target manual dalam satu laporan audit."}</p>
         </div>
         <div className="row-buttons">
           {report && <button className="button ghost" onClick={() => void exportReport("export_cleanup_detail", true)}><ButtonIcon icon={FolderOpen} />Buka Analyzer</button>}
@@ -1071,7 +1071,7 @@ function CleanPage({
         </div>
       </div>
       <ErrorBanner message={error} />
-      {!report && <Panel><EmptyState>Mulai pemindaian untuk menemukan cache browser/app, dev cache, shader cache, Downloads review, manual-only target, dan advisory disk hog.</EmptyState></Panel>}
+      {!report && <Panel><EmptyState>Mulai pemindaian untuk melihat folder cache, Windows Temp, dev cache, shader cache, Downloads review, dan advisory disk hog.</EmptyState></Panel>}
       {report && (
         <>
           <Panel className="critical-panel" title="STATUS" accent={summary?.cleanableBytes ? "amber" : "mint"} tag={report.scanFinishedAt ? `Scan selesai: ${report.scanFinishedAt}` : "Selesai"}>
@@ -1093,7 +1093,7 @@ function CleanPage({
           </Panel>
           <div className="summary-cards cleanup-scorecards">
             <Panel title="TOTAL SAMPAH" accent="amber"><div className="metric">{formatBytes(summary?.totalJunkBytes)}</div><p className="muted">{report.totalFiles} file</p></Panel>
-            <Panel title="SIAP DIBERSIHKAN" accent="mint"><div className="metric">{formatBytes(summary?.cleanableBytes)}</div><p className="muted">{summary?.cleanableItems} folder</p></Panel>
+            <Panel title="SIAP DIBERSIHKAN" accent="mint"><div className="metric">{formatBytes(summary?.cleanableBytes)}</div><p className="muted">{summary?.cleanableItems} item</p></Panel>
             <Panel title="PERLU REVIEW" accent="blue"><div className="metric">{summary?.reviewItems}</div><p className="muted">{formatBytes(summary?.reviewBytes)}</p></Panel>
             <Panel title="MANUAL / TERTAHAN" accent="amber"><div className="metric">{summary?.manualItems}</div><p className="muted">{formatBytes(summary?.manualBytes)}</p></Panel>
             <Panel title="ADMIN CLEAN" accent="amber"><div className="metric">{summary?.adminItems ?? 0}</div><p className="muted">{formatBytes(summary?.adminBytes ?? 0)}</p></Panel>
@@ -1176,7 +1176,7 @@ function CleanPage({
           </Panel>
           <Panel title="HASIL PEMINDAIAN" accent="mint" tag={`Menampilkan ${visibleItems.length} / ${filtered.length} item`}>
             <div className="cleanup-filterbar">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama folder, path, atau kategori..." />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Cari nama file/folder, path, atau kategori..." />
               <select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value as typeof riskFilter)}>
                 <option value="all">Semua Risiko</option>
                 <option value="low">Low</option>
@@ -1750,6 +1750,18 @@ function fileCategoryLabel(path: string) {
   return "Lainnya";
 }
 
+function samePath(left?: string, right?: string) {
+  return (left ?? "").replace(/[\\/]+$/, "").toLowerCase() === (right ?? "").replace(/[\\/]+$/, "").toLowerCase();
+}
+
+function childFoldersFor(result: DiskScanResult, root: string) {
+  const source = result.allFolders?.length ? result.allFolders : result.folders;
+  return source
+    .filter((folder) => samePath(folder.parentPath, root))
+    .sort((a, b) => b.sizeBytes - a.sizeBytes)
+    .slice(0, 250);
+}
+
 function StorageCategoryChart({
   result,
   selected,
@@ -1810,7 +1822,6 @@ function AnalyzePage({
   const [job, setJob] = useState<ScanJob>();
   const [progress, setProgress] = useState<DiskScanProgress>();
   const [result, setResult] = useState<DiskScanResult>();
-  const [resultHistory, setResultHistory] = useState<DiskScanResult[]>([]);
   const [analyzerTabs, setAnalyzerTabs] = useState(defaultAnalyzerTabs);
   const [analyzerTab, setAnalyzerTab] = useState(defaultAnalyzerTabs[0].id);
   const [storageCategoryFilter, setStorageCategoryFilter] = useState("");
@@ -1836,7 +1847,6 @@ function AnalyzePage({
 
   const completeScan = (payload: DiskScanResult) => {
     setResult(payload);
-    setResultHistory([]);
     setProgress(undefined);
     setJob(undefined);
     activeJobId.current = undefined;
@@ -2022,37 +2032,55 @@ function AnalyzePage({
   };
   const focusFolder = (folder: DiskFolder) => {
     if (!result) return;
-    const parentCrumb = result.breadcrumbs[result.breadcrumbs.length - 1];
-    setResultHistory((history) => [...history, result]);
+    const existingIndex = result.breadcrumbs.findIndex((crumb) => samePath(crumb.path, folder.path));
+    const breadcrumbs = existingIndex >= 0
+      ? result.breadcrumbs.slice(0, existingIndex + 1)
+      : [...result.breadcrumbs, { locationId: folder.locationId, label: folder.name, path: folder.path }];
     setResult({
       ...result,
       root: folder.path,
       rootLocationId: folder.locationId,
-      breadcrumbs: [
-        ...result.breadcrumbs,
-        { locationId: folder.locationId, label: folder.name, path: folder.path },
-      ],
-      parentLocation: parentCrumb,
+      breadcrumbs,
+      parentLocation: breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 2] : undefined,
       totalBytes: folder.sizeBytes,
       fileCount: folder.fileCount,
-      folders: [],
-      categories: [],
+      folders: childFoldersFor(result, folder.path),
       largestFiles: result.largestFiles.filter((file) => file.path.toLowerCase().startsWith(folder.path.toLowerCase())),
     });
     setSelected(new Set());
   };
   const goBackFolder = () => {
-    setResultHistory((history) => {
-      const previous = history[history.length - 1];
-      if (previous) setResult(previous);
-      return history.slice(0, -1);
+    if (!result?.parentLocation) return;
+    const folder = (result.allFolders ?? result.folders).find((item) => samePath(item.path, result.parentLocation?.path));
+    if (folder) {
+      focusFolder(folder);
+      return;
+    }
+    setResult({
+      ...result,
+      root: result.parentLocation.path,
+      rootLocationId: result.parentLocation.locationId,
+      breadcrumbs: result.breadcrumbs.slice(0, -1),
+      parentLocation: result.breadcrumbs.length > 2 ? result.breadcrumbs[result.breadcrumbs.length - 3] : undefined,
+      folders: childFoldersFor(result, result.parentLocation.path),
     });
   };
   const goToCachedBreadcrumb = (index: number) => {
-    if (index >= resultHistory.length) return;
-    const target = resultHistory[index];
-    setResult(target);
-    setResultHistory((history) => history.slice(0, index));
+    const target = result?.breadcrumbs[index];
+    if (!target || !result) return;
+    const folder = (result.allFolders ?? result.folders).find((item) => samePath(item.path, target.path));
+    if (folder) {
+      focusFolder(folder);
+      return;
+    }
+    setResult({
+      ...result,
+      root: target.path,
+      rootLocationId: target.locationId,
+      breadcrumbs: result.breadcrumbs.slice(0, index + 1),
+      parentLocation: index > 0 ? result.breadcrumbs[index - 1] : undefined,
+      folders: childFoldersFor(result, target.path),
+    });
   };
   const openSettings = async (destination: "storage" | "recommendations" | "volumes") => {
     try {
@@ -2078,11 +2106,11 @@ function AnalyzePage({
     <div className={`feature-page analyze-page ${dropActive ? "drop-active" : ""}`}>
       <div className="analyze-toolbar">
         <div className="breadcrumbs">
-          <button disabled={busy} onClick={() => { setResult(undefined); setResultHistory([]); }}>Drive</button>
+          <button disabled={busy} onClick={() => setResult(undefined)}>Drive</button>
           {result?.breadcrumbs.map((crumb) => (
             <span className="breadcrumb-item" key={crumb.locationId}>
               <span>/</span>
-              <button disabled={busy || resultHistory.length === 0} onClick={() => goToCachedBreadcrumb(result.breadcrumbs.findIndex((item) => item.locationId === crumb.locationId))}>{crumb.label}</button>
+              <button disabled={busy || crumb.path === result.root} onClick={() => goToCachedBreadcrumb(result.breadcrumbs.findIndex((item) => item.locationId === crumb.locationId))}>{crumb.label}</button>
             </span>
           ))}
         </div>
@@ -2147,7 +2175,7 @@ function AnalyzePage({
       )}
       {result && (
         <>
-          <Panel title="ANALYZER STORAGE" accent="blue" tag="adaptive_priority_scan - fallback">
+          <Panel title="ANALYZER STORAGE" accent="blue" tag="folder-size map">
             <div className="analyzer-summary">
               <span><strong>{formatBytes(result.totalBytes)}</strong>Total Terindeks</span>
               <span><strong>{formatBytes(result.categories.find((item) => item.label.includes("Data aplikasi"))?.sizeBytes ?? 0)}</strong>Cleanable</span>
@@ -2184,7 +2212,7 @@ function AnalyzePage({
                 <span>{result.fileCount} file - {result.inaccessible} dilewati</span>
               </div>
               {result.parentLocation && (
-                <button className="folder-item parent" disabled={busy || !resultHistory.length} onClick={goBackFolder}>
+                <button className="folder-item parent" disabled={busy} onClick={goBackFolder}>
                   <span>Naik satu folder</span>
                 </button>
               )}

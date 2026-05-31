@@ -152,6 +152,7 @@ export interface DiskFolder {
   nodeId?: string;
   name: string;
   path: string;
+  parentPath?: string;
   sizeBytes: number;
   fileCount: number;
 }
@@ -199,6 +200,7 @@ export interface DiskScanResult {
   fileCount: number;
   inaccessible: number;
   folders: DiskFolder[];
+  allFolders?: DiskFolder[];
   categories: DiskCategory[];
   largestFiles: LargeFile[];
 }
