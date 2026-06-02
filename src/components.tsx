@@ -53,14 +53,16 @@ export function Panel({
 export function ProgressBar({
   value,
   accent = "blue",
+  indeterminate = false,
 }: {
   value?: number | null;
   accent?: "mint" | "blue" | "amber";
+  indeterminate?: boolean;
 }) {
   const safeValue = isUsableNumber(value) ? value : 0;
   return (
-    <div className="progress">
-      <span className={accent} style={{ width: `${Math.min(100, Math.max(0, safeValue))}%` }} />
+    <div className={`progress ${indeterminate ? "indeterminate" : ""}`}>
+      <span className={accent} style={indeterminate ? undefined : { width: `${Math.min(100, Math.max(0, safeValue))}%` }} />
     </div>
   );
 }

@@ -8,6 +8,38 @@ const { invoke, listeners, dragDropHandlers } = vi.hoisted(() => ({
   dragDropHandlers: [] as Array<(event: { payload: unknown }) => void>,
 }));
 
+const defaultCleanupReport = {
+  items: [{
+    id: "cache-1",
+    name: "Cache Edge",
+    category: "Cache Edge",
+    group: "Browser Cache",
+    path: "Cache",
+    sizeBytes: 1024,
+    fileCount: 2,
+    skippedCount: 0,
+    safeToDelete: true,
+    riskLevel: "low",
+    decision: "clean",
+    safetyLabel: "Aman dihapus",
+    safetyNote: "Cache sementara",
+  }],
+  advisories: [],
+  scanEngine: "Native",
+  cachePath: null,
+  totalBytes: 1024,
+  totalFiles: 2,
+  skippedCount: 0,
+};
+
+function completeCleanupScan(report: unknown = defaultCleanupReport) {
+  queueMicrotask(() => listeners.get("cleanup-scan-complete")?.({ payload: report }));
+}
+
+function completeCleanupDelete(report: unknown = { success: true, message: "Item terpilih telah dihapus permanen.", affectedCount: 1, reclaimedBytes: 1024, skippedCount: 0 }) {
+  queueMicrotask(() => listeners.get("cleanup-delete-complete")?.({ payload: report }));
+}
+
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockImplementation((eventName: string, callback: (event: { payload: unknown }) => void) => {
@@ -28,9 +60,6 @@ vi.mock("@tauri-apps/api/webview", () => ({
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn().mockResolvedValue(null),
-}));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  openPath: vi.fn().mockResolvedValue(undefined),
 }));
 
 afterEach(cleanup);
@@ -56,22 +85,14 @@ beforeEach(() => {
       });
     }
     if (command === "scan_cleanup" || command === "scan_deep_cleanup") {
-      return Promise.resolve({
-        items: [{
-          id: "cache-1",
-          category: "Cache Edge",
-          path: "Cache",
-          sizeBytes: 1024,
-          fileCount: 2,
-          skippedCount: 0,
-          safeToDelete: true,
-          safetyLabel: "Aman dihapus",
-          safetyNote: "Cache sementara",
-        }],
-        totalBytes: 1024,
-        totalFiles: 2,
-        skippedCount: 0,
-      });
+      return Promise.resolve(defaultCleanupReport);
+    }
+    if (command === "start_cleanup_scan") {
+      completeCleanupScan();
+      return Promise.resolve({ jobId: "cleanup-job", root: "Deep Cleanup", engine: "Native" });
+    }
+    if (command === "get_active_cleanup_scan" || command === "get_active_cleanup_delete") {
+      return Promise.resolve(null);
     }
     if (command === "scan_project_artifacts") {
       return Promise.resolve({
@@ -112,6 +133,10 @@ beforeEach(() => {
     if (command === "delete_cleanup_items") {
       return Promise.resolve({ success: true, message: "Item terpilih telah dihapus permanen.", affectedCount: 1, reclaimedBytes: 1024, skippedCount: 0 });
     }
+    if (command === "start_cleanup_delete") {
+      completeCleanupDelete();
+      return Promise.resolve({ jobId: "cleanup-delete-job", root: "1 item terpilih" });
+    }
     if (command === "list_installed_apps") {
       return Promise.resolve([{
         id: "app-1",
@@ -147,7 +172,7 @@ beforeEach(() => {
       }]);
     }
     if (command === "start_disk_scan") {
-      return Promise.resolve({ jobId: "job-current", root: "C:\\" });
+      return Promise.resolve({ jobId: "job-current", root: "C:\\", engine: "Native" });
     }
     if (command === "get_active_disk_scan") {
       return Promise.resolve(null);
@@ -204,7 +229,7 @@ describe("LeoDisk", () => {
     await waitFor(() => expect(screen.getAllByText("Cache Edge").length).toBeGreaterThan(0));
     expect(screen.getAllByText(/Aman dihapus/).length).toBeGreaterThan(0);
     expect(screen.getByText(/1 clean \+ 0 admin dipilih/)).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith("scan_deep_cleanup");
+    expect(invoke).toHaveBeenCalledWith("start_cleanup_scan", { scanEngine: "native" });
     fireEvent.click(screen.getAllByRole("button", { name: "Buka Folder" })[0]);
     expect(invoke).toHaveBeenCalledWith("open_scanned_location", { itemId: "cache-1" });
   });
@@ -220,8 +245,8 @@ describe("LeoDisk", () => {
     fireEvent.click(screen.getByRole("button", { name: "Bersihkan" }));
     expect(screen.getAllByText("Cache Edge").length).toBeGreaterThan(0);
     expect(screen.getByText("Preflight Evidence")).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith("scan_deep_cleanup");
-    expect(invoke.mock.calls.filter(([command]) => command === "scan_deep_cleanup")).toHaveLength(1);
+    expect(invoke).toHaveBeenCalledWith("start_cleanup_scan", { scanEngine: "native" });
+    expect(invoke.mock.calls.filter(([command]) => command === "start_cleanup_scan")).toHaveLength(1);
   });
 
   it("menampilkan grafik cleanup dan filter kategori dari hasil deep scan", async () => {
@@ -241,8 +266,8 @@ describe("LeoDisk", () => {
           processes: [],
         });
       }
-      if (command === "scan_deep_cleanup") {
-        return Promise.resolve({
+      if (command === "start_cleanup_scan") {
+        completeCleanupScan({
           items: [{
             id: "dev-cache",
             name: "NPM Cache",
@@ -264,8 +289,9 @@ describe("LeoDisk", () => {
           totalFiles: 5,
           skippedCount: 0,
         });
+        return Promise.resolve({ jobId: "cleanup-job", root: "Deep Cleanup", engine: "Native" });
       }
-      if (command === "get_active_disk_scan") return Promise.resolve(null);
+      if (command === "get_active_disk_scan" || command === "get_active_cleanup_scan" || command === "get_active_cleanup_delete") return Promise.resolve(null);
       return Promise.resolve([]);
     });
     render(<App />);
@@ -293,8 +319,8 @@ describe("LeoDisk", () => {
           processes: [],
         });
       }
-      if (command === "scan_deep_cleanup") {
-        return Promise.resolve({
+      if (command === "start_cleanup_scan") {
+        completeCleanupScan({
           items: [{
             id: "safe-cache",
             name: "User Temp",
@@ -331,8 +357,9 @@ describe("LeoDisk", () => {
           totalFiles: 2,
           skippedCount: 0,
         });
+        return Promise.resolve({ jobId: "cleanup-job", root: "Deep Cleanup", engine: "Native" });
       }
-      if (command === "get_active_disk_scan") return Promise.resolve(null);
+      if (command === "get_active_disk_scan" || command === "get_active_cleanup_scan" || command === "get_active_cleanup_delete") return Promise.resolve(null);
       return Promise.resolve([]);
     });
     render(<App />);
@@ -360,8 +387,8 @@ describe("LeoDisk", () => {
           processes: [],
         });
       }
-      if (command === "scan_deep_cleanup") {
-        return Promise.resolve({
+      if (command === "start_cleanup_scan") {
+        completeCleanupScan({
           items: [{
             id: "safe-cache",
             name: "User Temp",
@@ -398,17 +425,19 @@ describe("LeoDisk", () => {
           totalFiles: 11,
           skippedCount: 1,
         });
+        return Promise.resolve({ jobId: "cleanup-job", root: "Deep Cleanup", engine: "Native" });
       }
-      if (command === "delete_cleanup_items") {
-        return Promise.resolve({ success: true, message: "Item terpilih dipindahkan ke Recycle Bin.", affectedCount: 2, reclaimedBytes: 5120, skippedCount: 1 });
+      if (command === "start_cleanup_delete") {
+        completeCleanupDelete({ success: true, message: "Item terpilih dipindahkan ke Recycle Bin.", affectedCount: 2, reclaimedBytes: 5120, skippedCount: 1 });
+        return Promise.resolve({ jobId: "cleanup-delete-job", root: "2 item terpilih" });
       }
-      if (command === "get_active_disk_scan") return Promise.resolve(null);
+      if (command === "get_active_disk_scan" || command === "get_active_cleanup_scan" || command === "get_active_cleanup_delete") return Promise.resolve(null);
       return Promise.resolve([]);
     });
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Bersihkan" }));
     fireEvent.click(screen.getByRole("button", { name: "Pindai Deep Cleanup" }));
-    await waitFor(() => expect(screen.getByText("Windows System Temp")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("Windows System Temp").length).toBeGreaterThan(0));
     expect(screen.getByRole("checkbox", { name: "Pilih Windows System Temp" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Izinkan" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Pilih Windows System Temp" }));
@@ -417,7 +446,7 @@ describe("LeoDisk", () => {
     expect(screen.getByRole("button", { name: /Ke Recycle Bin/ })).toBeDisabled();
     fireEvent.change(screen.getByPlaceholderText("SAYA MENGERTI"), { target: { value: "SAYA MENGERTI" } });
     fireEvent.click(screen.getByRole("button", { name: /Ke Recycle Bin/ }));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("delete_cleanup_items", expect.objectContaining({
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("start_cleanup_delete", expect.objectContaining({
       itemIds: expect.arrayContaining(["safe-cache", "windows-temp"]),
       permanent: false,
       adminConfirmed: true,
@@ -465,7 +494,7 @@ describe("LeoDisk", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hapus item terpilih" }));
     expect(screen.getByRole("dialog", { name: "Bersihkan item terpilih?" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hapus permanen" }));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("delete_cleanup_items", expect.objectContaining({
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("start_cleanup_delete", expect.objectContaining({
       itemIds: ["cache-1"],
       permanent: true,
       adminConfirmed: false,
@@ -557,6 +586,43 @@ describe("LeoDisk", () => {
           skippedCount: 0,
         });
       }
+      if (command === "start_cleanup_scan") {
+        completeCleanupScan({
+          items: [
+            {
+              id: "safe-cache",
+              category: "Cache aman",
+              path: "Cache",
+              sizeBytes: 1024,
+              fileCount: 2,
+              skippedCount: 0,
+              safeToDelete: true,
+              riskLevel: "low",
+              decision: "clean",
+              safetyLabel: "Aman dihapus",
+              safetyNote: "Cache sementara",
+            },
+            {
+              id: "review-cache",
+              category: "Data perlu diperiksa",
+              path: "Data",
+              sizeBytes: 2048,
+              fileCount: 1,
+              skippedCount: 0,
+              safeToDelete: false,
+              riskLevel: "medium",
+              decision: "review",
+              safetyLabel: "Periksa dahulu",
+              safetyNote: "Berisi data pengguna",
+            },
+          ],
+          totalBytes: 3072,
+          totalFiles: 3,
+          skippedCount: 0,
+        });
+        return Promise.resolve({ jobId: "cleanup-job", root: "Deep Cleanup", engine: "Native" });
+      }
+      if (command === "get_active_cleanup_scan" || command === "get_active_cleanup_delete") return Promise.resolve(null);
       return Promise.resolve([]);
     });
     render(<App />);
@@ -574,11 +640,13 @@ describe("LeoDisk", () => {
     await waitFor(() => expect(screen.getByText("Windows")).toBeInTheDocument());
     expect(invoke).not.toHaveBeenCalledWith("start_disk_scan", expect.anything());
     fireEvent.click(screen.getByRole("button", { name: "Pindai" }));
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("start_disk_scan", { root: "C:\\" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("start_disk_scan", { root: "C:\\", scanEngine: "native" }));
     const complete = listeners.get("disk-scan-complete");
     complete?.({ payload: {
       jobId: "job-old",
       root: "D:\\",
+      engine: "Native",
+      cachePath: null,
       rootLocationId: "old-root",
       breadcrumbs: [],
       totalBytes: 1,
@@ -592,6 +660,8 @@ describe("LeoDisk", () => {
     complete?.({ payload: {
       jobId: "job-current",
       root: "C:\\",
+      engine: "Native",
+      cachePath: null,
       rootLocationId: "root-c",
       breadcrumbs: [{ locationId: "root-c", label: "C:\\", path: "C:\\" }],
       totalBytes: 60000,
@@ -614,6 +684,7 @@ describe("LeoDisk", () => {
     listeners.get("disk-scan-progress")?.({ payload: {
       jobId: "job-current",
       root: "C:\\",
+      engine: "Native",
       filesScanned: 24,
       foldersScanned: 4,
       bytesScanned: 4096,
@@ -623,6 +694,8 @@ describe("LeoDisk", () => {
     listeners.get("disk-scan-complete")?.({ payload: {
       jobId: "job-current",
       root: "C:\\",
+      engine: "Native",
+      cachePath: null,
       rootLocationId: "root-c",
       breadcrumbs: [{ locationId: "root-c", label: "C:\\", path: "C:\\" }],
       totalBytes: 60000,
@@ -642,6 +715,6 @@ describe("LeoDisk", () => {
     await waitFor(() => expect(screen.getByText("Windows")).toBeInTheDocument());
     await waitFor(() => expect(dragDropHandlers.length).toBeGreaterThan(0));
     dragDropHandlers[0]?.({ payload: { type: "drop", paths: ["C:\\Users\\demo\\Downloads"] } });
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith("start_disk_scan", { root: "C:\\Users\\demo\\Downloads" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("start_disk_scan", { root: "C:\\Users\\demo\\Downloads", scanEngine: "native" }));
   });
 });

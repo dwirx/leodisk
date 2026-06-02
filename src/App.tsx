@@ -21,7 +21,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath } from "@tauri-apps/plugin-opener";
 import {
   Activity,
   AppWindow,
@@ -80,16 +79,20 @@ import type {
   ActionReport,
   AppSizeMeasurement,
   CleanupItem,
+  CleanupDeleteProgress,
   CleanupReport,
+  CleanupScanProgress,
   DiskScanProgress,
   DiskScanResult,
   DiskFolder,
   InstalledApp,
+  ProcessMetric,
   ScanJob,
   StorageVolume,
   StartupItem,
   SystemSnapshot,
   Tab,
+  WizTreeStatus,
 } from "./types";
 import "./App.css";
 
@@ -124,6 +127,24 @@ const defaultAnalyzerTabs: AnalyzerTab[] = [
 const CHART_COLORS = ["#4bc49c", "#579be6", "#e8af62", "#dc7763", "#b8a989", "#8dd5f7"];
 const ADMIN_CONFIRMATION_PHRASE = "SAYA MENGERTI";
 type CleanupDecision = NonNullable<CleanupItem["decision"]>;
+type DiskScanEngineId = "native" | "dust" | "wiztree";
+const scanEngineOptions: Array<{ id: DiskScanEngineId; label: string; detail: string }> = [
+  { id: "native", label: "Native", detail: "Scanner Rust LeoDisk" },
+  { id: "dust", label: "Dust", detail: "Aggregator Rust gaya dust" },
+  { id: "wiztree", label: "WizTree", detail: "CLI CSV cache tunggal" },
+];
+const cleanupScopes = [
+  ["%TEMP%", "Windows Temp", "Recycle Bin"],
+  ["Chrome", "Edge", "Firefox"],
+  ["Node.js", "npm/yarn/pnpm", "Python/pip"],
+  ["Spotify", "Slack", "VS Code"],
+  ["Windows logs", "Crash dumps", "Shader cache"],
+];
+const remnantScopes = [
+  ["AppData", "cache", "logs"],
+  ["preferences/config", "extensions/plugins", "local storage"],
+  ["registry uninstall dibaca", "registry tidak dihapus otomatis", "sisa folder direview"],
+];
 
 function messageOf(error: unknown): string {
   if (typeof error === "string" && error.trim()) {
@@ -231,6 +252,72 @@ function useSystemSnapshot(active: boolean) {
   return { snapshot, cpuHistory, networkHistory, error };
 }
 
+function useWizTreeTools(notify?: (message: string) => void) {
+  const [status, setStatus] = useState<WizTreeStatus>();
+  const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [error, setError] = useState<string>();
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const next = await invoke<WizTreeStatus>("get_wiztree_status");
+      setStatus(next);
+      setError(undefined);
+      return next;
+    } catch (statusError) {
+      const message = messageOf(statusError);
+      setError(message);
+      return undefined;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const install = async () => {
+    setInstalling(true);
+    try {
+      const next = await invoke<WizTreeStatus>("install_wiztree_portable");
+      setStatus(next);
+      setError(undefined);
+      notify?.(next.message);
+      return next;
+    } catch (installError) {
+      const message = messageOf(installError);
+      setError(message);
+      notify?.(message);
+      return undefined;
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const verify = async () => {
+    setVerifying(true);
+    try {
+      const next = await invoke<WizTreeStatus>("verify_wiztree_status");
+      setStatus(next);
+      setError(next.lastError ?? undefined);
+      notify?.(next.message);
+      return next;
+    } catch (verifyError) {
+      const message = messageOf(verifyError);
+      setError(message);
+      notify?.(message);
+      return undefined;
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  return { status, loading, verifying, installing, error, refresh, verify, install };
+}
+
 function StatusPage({
   active,
   latestCleanup,
@@ -249,6 +336,20 @@ function StatusPage({
         ? { score: "86", text: "Cukup baik" }
         : { score: "68", text: "Perlu dibersihkan" }
     : { score: "--", text: "Belum dipindai" };
+  const topCpu = snapshot?.processes.reduce<ProcessMetric | undefined>(
+    (top, process) => !top || process.cpuPercent > top.cpuPercent ? process : top,
+    undefined,
+  );
+  const topMemory = snapshot?.processes.reduce<ProcessMetric | undefined>(
+    (top, process) => !top || process.memoryBytes > top.memoryBytes ? process : top,
+    undefined,
+  );
+  const loadSignals = [
+    snapshot && snapshot.cpuPercent >= 80 ? "CPU tinggi" : undefined,
+    memoryPercent !== undefined && memoryPercent >= 80 ? "Memori tinggi" : undefined,
+    diskPercent !== undefined && diskPercent >= 88 ? "Disk hampir penuh" : undefined,
+    snapshot && (snapshot.networkDownPerSec + snapshot.networkUpPerSec) > 1024 * 1024 ? "Network aktif" : undefined,
+  ].filter((item): item is string => Boolean(item));
 
   return (
     <>
@@ -312,6 +413,18 @@ function StatusPage({
           ) : (
             <EmptyState>Tidak ada baterai terdeteksi</EmptyState>
           )}
+        </Panel>
+      </div>
+      <div className="status-insights">
+        <Panel title="PROSES TERBERAT" accent="amber" tag={topCpu ? formatPercent(topCpu.cpuPercent) : "--"}>
+          <div className="insight-row"><span>CPU</span><strong>{topCpu?.name ?? "Tidak ada data"}</strong><small>{topCpu ? `PID ${topCpu.pid}` : "--"}</small></div>
+          <div className="insight-row"><span>Memori</span><strong>{topMemory?.name ?? "Tidak ada data"}</strong><small>{topMemory ? formatBytes(topMemory.memoryBytes) : "--"}</small></div>
+        </Panel>
+        <Panel title="HEALTH INPUT" accent={loadSignals.length ? "amber" : "mint"} tag={`${loadSignals.length} sinyal`}>
+          <div className="health-flags">
+            {(loadSignals.length ? loadSignals : ["Stabil"]).map((signal) => <span key={signal}>{signal}</span>)}
+          </div>
+          <p className="muted">CPU, memori, disk, network, dan proses berat dihitung dari snapshot real-time.</p>
         </Panel>
       </div>
       <Panel className="process-panel">
@@ -494,6 +607,14 @@ function cleanupSummary(report: CleanupReport) {
 
 function decisionOf(item: CleanupItem): CleanupDecision {
   return item.decision ?? (item.safeToDelete ? "clean" : "review");
+}
+
+function formatElapsed(ms?: number | null) {
+  if (!ms || ms < 0) return "0s";
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes ? `${minutes}m ${String(rest).padStart(2, "0")}s` : `${rest}s`;
 }
 
 function riskLabel(value?: string) {
@@ -699,7 +820,7 @@ function CleanupCharts({
     <div className="chart-grid cleanup-charts">
       <Panel title="GRAFIK KATEGORI" accent="blue" tag={selectedCategory || "Semua"}>
         <div className="chart-box">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
             <BarChart data={categories} margin={{ top: 6, right: 8, bottom: 36, left: 4 }}>
               <CartesianGrid stroke="rgba(236,222,190,0.1)" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: "#b7afa2", fontSize: 11 }} interval={0} angle={-22} textAnchor="end" height={50} />
@@ -716,7 +837,7 @@ function CleanupCharts({
       </Panel>
       <Panel title="KEPUTUSAN" accent="mint">
         <div className="chart-box compact-chart">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
             <PieChart>
               <Pie data={decisions} dataKey="value" nameKey="name" innerRadius={48} outerRadius={82} paddingAngle={3}>
                 {decisions.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
@@ -729,7 +850,7 @@ function CleanupCharts({
       </Panel>
       <Panel title="RISIKO" accent="amber">
         <div className="chart-box compact-chart">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
             <PieChart>
               <Pie data={risks} dataKey="value" nameKey="name" innerRadius={46} outerRadius={80} paddingAngle={3}>
                 {risks.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />)}
@@ -851,10 +972,14 @@ function CleanupConfirmDialog({
   return (
     <div className="dialog-backdrop" role="presentation">
       <div className="dialog admin-clean-dialog" role="dialog" aria-modal="true" aria-label="Bersihkan item terpilih?">
-        <h2>Bersihkan item terpilih?</h2>
-        <p>
-          LeoDisk akan memproses item yang dipilih, melewati file yang terkunci, dan tidak menghapus folder induk sistem.
-        </p>
+        <div className="dialog-title-row">
+          <span>
+            <h2>Bersihkan item terpilih?</h2>
+            <p>
+              LeoDisk akan memproses item yang dipilih, melewati file yang terkunci, dan tidak menghapus folder induk sistem.
+            </p>
+          </span>
+        </div>
         <div className="confirm-summary-grid">
           <span><small>Clean biasa</small><strong>{cleanCount}</strong></span>
           <span><small>Admin clean</small><strong>{adminCount}</strong></span>
@@ -868,6 +993,7 @@ function CleanupConfirmDialog({
               value={phrase}
               onChange={(event) => onPhraseChange(event.target.value)}
               placeholder={ADMIN_CONFIRMATION_PHRASE}
+              aria-label="Phrase konfirmasi Admin Clean"
               autoFocus
             />
           </label>
@@ -888,11 +1014,154 @@ function CleanupConfirmDialog({
   );
 }
 
+function ScanProgressPanel({
+  title,
+  detail,
+  phase,
+  value,
+  stats = [],
+  action,
+}: {
+  title: string;
+  detail: string;
+  phase?: string;
+  value?: number;
+  stats?: Array<[string, string | number]>;
+  action?: ReactNode;
+}) {
+  return (
+    <Panel className="scan-progress-panel" title="SCAN BERJALAN" accent="blue" tag="live">
+      <div className="scan-progress-head">
+        <span>
+          <strong>{title}</strong>
+          {phase && <small className="scan-progress-phase">{phase}</small>}
+          <p>{detail}</p>
+        </span>
+        <span className="scan-progress-actions">
+          {action}
+          <Loader2 size={22} aria-hidden="true" />
+        </span>
+      </div>
+      <ProgressBar value={value} indeterminate={value === undefined} accent="blue" />
+      {!!stats.length && (
+        <div className="scan-progress-stats">
+          {stats.map(([label, value]) => (
+            <span key={label}><strong>{value}</strong>{label}</span>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function WizTreeStatusPanel({
+  status,
+  loading,
+  installing,
+  verifying,
+  error,
+  onRefresh,
+  onVerify,
+  onInstall,
+}: {
+  status?: WizTreeStatus;
+  loading: boolean;
+  installing: boolean;
+  verifying: boolean;
+  error?: string;
+  onRefresh: () => void;
+  onVerify: () => void;
+  onInstall: () => void;
+}) {
+  const available = !!status?.available;
+  const verified = !!status?.verified;
+  return (
+    <Panel className={`wiztree-status-panel ${verified ? "ready" : "missing"}`} title="WIZTREE CLI" accent={verified ? "mint" : "amber"} tag={verified ? "Lulus uji" : available ? "Belum diuji" : "Perlu download"}>
+      <div className="wiztree-status-layout">
+        <span className="wiztree-status-dot" aria-hidden="true" />
+        <div className="wiztree-status-copy">
+          <strong>{verified ? "WizTree siap dipakai" : available ? "WizTree terdeteksi, perlu uji CLI" : "WizTree portable belum ditemukan"}</strong>
+          <p>{error ?? status?.lastError ?? status?.message ?? "LeoDisk akan menjalankan export kecil lebih dulu untuk memastikan WizTree benar-benar bekerja."}</p>
+          <code>{available ? status?.executablePath : status?.installDir}</code>
+        </div>
+        <div className="wiztree-status-actions">
+          <button className="button ghost compact" disabled={loading || installing || verifying} onClick={onRefresh}>
+            <ButtonIcon icon={Search} />
+            Cek ulang
+          </button>
+          {available && (
+            <button className="button ghost compact" disabled={installing || verifying} onClick={onVerify}>
+              <ButtonIcon icon={verifying ? Loader2 : Check} />
+              {verifying ? "Menguji..." : "Uji WizTree"}
+            </button>
+          )}
+          {!available && (
+            <button className="button primary compact" disabled={installing} onClick={onInstall}>
+              <ButtonIcon icon={installing ? Loader2 : Download} />
+              {installing ? "Download..." : "Download portable"}
+            </button>
+          )}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function CleanupItemGraph({
+  items,
+  onFocus,
+  onOpen,
+}: {
+  items: CleanupItem[];
+  onFocus: (item: CleanupItem) => void;
+  onOpen: (itemId: string) => void;
+}) {
+  const topItems = items
+    .filter((item) => item.sizeBytes > 0)
+    .sort((a, b) => b.sizeBytes - a.sizeBytes)
+    .slice(0, 14);
+  const maxSize = Math.max(...topItems.map((item) => item.sizeBytes), 1);
+  return (
+    <Panel title="GRAPH CLEANUP INTERAKTIF" accent="blue" tag={`${topItems.length} item terbesar`}>
+      <div className="folder-graph cleanup-item-graph">
+        {topItems.map((item, index) => {
+          const percent = Math.max(4, (item.sizeBytes / maxSize) * 100);
+          return (
+            <article className={`folder-graph-row cleanup-graph-row ${decisionOf(item)}`} key={item.id}>
+              <button
+                className="folder-graph-track"
+                onClick={() => onFocus(item)}
+                style={{ "--bar": `${percent}%` } as CSSProperties}
+              >
+                <span className="folder-graph-rank">{String(index + 1).padStart(2, "0")}</span>
+                <span className="folder-graph-name">
+                  <strong>{item.name ?? item.category}</strong>
+                  <small>{item.path}</small>
+                </span>
+                <span className="folder-graph-size">
+                  <strong>{formatBytes(item.sizeBytes)}</strong>
+                  <small>{decisionOf(item)} - {item.fileCount} file</small>
+                </span>
+              </button>
+              <button className="text-action folder-graph-open" onClick={() => onOpen(item.id)}>
+                Buka
+              </button>
+            </article>
+          );
+        })}
+        {!topItems.length && <EmptyState>Tidak ada item cleanup berukuran besar untuk graph.</EmptyState>}
+      </div>
+    </Panel>
+  );
+}
+
 function CleanPage({
   onReport,
+  onStatus,
   notify,
 }: {
   onReport: (report: CleanupReport) => void;
+  onStatus: (status: CleanupStatus) => void;
   notify: (message: string) => void;
 }) {
   const [report, setReport] = useState<CleanupReport>();
@@ -905,37 +1174,199 @@ function CleanPage({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [sizeFilter, setSizeFilter] = useState<0 | 100 | 500 | 1024>(0);
   const [sort, setSort] = useState<"size" | "name" | "priority">("size");
+  const [scanEngine, setScanEngine] = useState<DiskScanEngineId>("native");
   const [visibleLimit, setVisibleLimit] = useState(80);
   const [reviewed, setReviewed] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [, setListenersReady] = useState(false);
+  const [scanJob, setScanJob] = useState<ScanJob>();
+  const [scanProgress, setScanProgress] = useState<CleanupScanProgress>();
+  const [deleteJob, setDeleteJob] = useState<ScanJob>();
+  const [deleteProgress, setDeleteProgress] = useState<CleanupDeleteProgress>();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string>();
+  const wizTree = useWizTreeTools(notify);
+  const scanJobId = useRef<string | undefined>(undefined);
+  const deleteJobId = useRef<string | undefined>(undefined);
+  const acceptingScanStart = useRef(false);
+  const pendingScanReport = useRef<CleanupReport | undefined>(undefined);
+  const pendingScanProgress = useRef<CleanupScanProgress | undefined>(undefined);
+  const pendingScanError = useRef<{ jobId: string; message: string } | undefined>(undefined);
+  const deletingIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (report) onReport(report);
   }, [onReport, report]);
 
+  useEffect(() => {
+    onStatus({ scanJob, scanProgress, deleteJob, deleteProgress, error });
+  }, [deleteJob, deleteProgress, error, onStatus, scanJob, scanProgress]);
+
+  const applyCleanupReport = (result: CleanupReport) => {
+    setReport(result);
+    setSelected(new Set(result.items.filter((item) => decisionOf(item) === "clean").map((item) => item.id)));
+    setAdminUnlocked(new Set());
+    setAdminPhrase("");
+    setReviewed(new Set());
+    setExpanded(new Set(result.items[0] ? [result.items[0].id] : []));
+    setVisibleLimit(80);
+  };
+
+  const completeScan = (result: CleanupReport) => {
+    applyCleanupReport(result);
+    setScanProgress(undefined);
+    setScanJob(undefined);
+    scanJobId.current = undefined;
+    setLoading(false);
+  };
+
+  const failScan = (message: string) => {
+    setError(message);
+    setScanProgress(undefined);
+    setScanJob(undefined);
+    scanJobId.current = undefined;
+    setLoading(false);
+  };
+
+  const completeDelete = (result: ActionReport) => {
+    notify(result.message);
+    setReport((current) => {
+      if (!current) return current;
+      const removed = deletingIds.current;
+      const nextItems = current.items.filter((item) => !removed.has(item.id));
+      return {
+        ...current,
+        items: nextItems,
+        totalBytes: nextItems.reduce((sum, item) => sum + item.sizeBytes, 0),
+        totalFiles: nextItems.reduce((sum, item) => sum + item.fileCount, 0),
+        skippedCount: nextItems.reduce((sum, item) => sum + item.skippedCount, 0),
+        summary: undefined,
+        categoryTotals: undefined,
+      };
+    });
+    deletingIds.current = new Set();
+    setSelected(new Set());
+    setAdminUnlocked(new Set());
+    setAdminPhrase("");
+    setDeleteProgress(undefined);
+    setDeleteJob(undefined);
+    deleteJobId.current = undefined;
+  };
+
+  const failDelete = (message: string) => {
+    setError(message);
+    deletingIds.current = new Set();
+    setDeleteProgress(undefined);
+    setDeleteJob(undefined);
+    deleteJobId.current = undefined;
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    setListenersReady(false);
+    const handlers = Promise.all([
+      listen<CleanupScanProgress>("cleanup-scan-progress", (event) => {
+        const payload = event.payload;
+        if (payload.jobId === scanJobId.current) {
+          setScanProgress(payload);
+        } else if (acceptingScanStart.current) {
+          pendingScanProgress.current = payload;
+        }
+      }),
+      listen<CleanupReport>("cleanup-scan-complete", (event) => {
+        if (scanJobId.current || acceptingScanStart.current) {
+          pendingScanReport.current = event.payload;
+          completeScan(event.payload);
+        }
+      }),
+      listen<{ jobId: string; message: string }>("cleanup-scan-error", (event) => {
+        if (event.payload.jobId === scanJobId.current) {
+          failScan(event.payload.message);
+        } else if (acceptingScanStart.current) {
+          pendingScanError.current = event.payload;
+        }
+      }),
+      listen<CleanupDeleteProgress>("cleanup-delete-progress", (event) => {
+        if (event.payload.jobId === deleteJobId.current) {
+          setDeleteProgress(event.payload);
+        }
+      }),
+      listen<ActionReport>("cleanup-delete-complete", (event) => {
+        if (deleteJobId.current) completeDelete(event.payload);
+      }),
+      listen<{ jobId: string; message: string }>("cleanup-delete-error", (event) => {
+        if (event.payload.jobId === deleteJobId.current) failDelete(event.payload.message);
+      }),
+    ]);
+    void handlers.then(() => {
+      if (mounted) setListenersReady(true);
+    });
+    void invoke<ScanJob | null>("get_active_cleanup_scan")
+      .then((activeScan) => {
+        if (!mounted || !activeScan) return;
+        scanJobId.current = activeScan.jobId;
+        setScanJob(activeScan);
+        setLoading(true);
+        setError("Scan cleanup masih berjalan di background. Anda bisa pindah tab tanpa scan ulang.");
+      })
+      .catch(() => {});
+    void invoke<ScanJob | null>("get_active_cleanup_delete")
+      .then((activeDelete) => {
+        if (!mounted || !activeDelete) return;
+        deleteJobId.current = activeDelete.jobId;
+        setDeleteJob(activeDelete);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+      setListenersReady(false);
+      void handlers.then((unlisteners) => unlisteners.forEach((unlisten) => unlisten()));
+    };
+  }, []);
+
   const scan = async () => {
+    if (scanJob || loading) return;
     setLoading(true);
     setError(undefined);
+    acceptingScanStart.current = true;
+    pendingScanReport.current = undefined;
+    pendingScanProgress.current = undefined;
+    pendingScanError.current = undefined;
     try {
-      const result = await invoke<CleanupReport>("scan_deep_cleanup");
-      setReport(result);
-      setSelected(new Set(result.items.filter((item) => decisionOf(item) === "clean").map((item) => item.id)));
-      setAdminUnlocked(new Set());
-      setAdminPhrase("");
-      setReviewed(new Set());
-      setExpanded(new Set(result.items[0] ? [result.items[0].id] : []));
-      setVisibleLimit(80);
+      const nextJob = await invoke<ScanJob>("start_cleanup_scan", { scanEngine });
+      scanJobId.current = nextJob.jobId;
+      setScanJob(nextJob);
+      const completed = pendingScanReport.current as CleanupReport | undefined;
+      const failed = pendingScanError.current as { jobId: string; message: string } | undefined;
+      const progressEvent = pendingScanProgress.current as CleanupScanProgress | undefined;
+      if (completed) {
+        completeScan(completed);
+      } else if (failed?.jobId === nextJob.jobId) {
+        failScan(failed.message);
+      } else if (progressEvent?.jobId === nextJob.jobId) {
+        setScanProgress(progressEvent);
+      }
     } catch (scanError) {
       setError(messageOf(scanError));
-    } finally {
       setLoading(false);
+    } finally {
+      acceptingScanStart.current = false;
+    }
+  };
+
+  const cancelScan = async () => {
+    if (!scanJob) return;
+    try {
+      const result = await invoke<ActionReport>("cancel_cleanup_scan", { jobId: scanJob.jobId });
+      notify(result.message);
+    } catch (cancelError) {
+      setError(messageOf(cancelError));
     }
   };
 
   const remove = async (permanent: boolean) => {
+    if (deleteJob) return;
     const selectedItems = allItems.filter((item) => selected.has(item.id));
     const hasAdmin = selectedItems.some((item) => decisionOf(item) === "admin");
     if (hasAdmin && adminPhrase.trim() !== ADMIN_CONFIRMATION_PHRASE) {
@@ -943,33 +1374,20 @@ function CleanPage({
       return;
     }
     setConfirming(false);
+    setError(undefined);
+    deletingIds.current = new Set(selected);
     try {
-      const result = await invoke<ActionReport>("delete_cleanup_items", {
+      const nextJob = await invoke<ScanJob>("start_cleanup_delete", {
         itemIds: [...selected],
         permanent,
         adminConfirmed: hasAdmin,
         adminConfirmationPhrase: hasAdmin ? adminPhrase.trim() : undefined,
       });
-      notify(result.message);
-      setReport((current) => {
-        if (!current) return current;
-        const removed = new Set(selected);
-        const nextItems = current.items.filter((item) => !removed.has(item.id));
-        const nextReport = {
-          ...current,
-          items: nextItems,
-          totalBytes: nextItems.reduce((sum, item) => sum + item.sizeBytes, 0),
-          totalFiles: nextItems.reduce((sum, item) => sum + item.fileCount, 0),
-          skippedCount: nextItems.reduce((sum, item) => sum + item.skippedCount, 0),
-          summary: undefined,
-          categoryTotals: undefined,
-        };
-        return nextReport;
-      });
-      setSelected(new Set());
-      setAdminUnlocked(new Set());
-      setAdminPhrase("");
+      deleteJobId.current = nextJob.jobId;
+      setDeleteJob(nextJob);
+      setDeleteProgress(undefined);
     } catch (removeError) {
+      deletingIds.current = new Set();
       setError(messageOf(removeError));
     }
   };
@@ -995,7 +1413,7 @@ function CleanPage({
       notify(`Export dibuat: ${result.message}`);
       if (openFile) {
         try {
-          await openPath(result.message);
+          await invoke<ActionReport>("open_exported_cleanup_file", { path: result.message });
         } catch (openError) {
           setError(`Export dibuat di ${result.message}, tetapi tidak bisa dibuka otomatis: ${messageOf(openError)}`);
         }
@@ -1054,6 +1472,14 @@ function CleanPage({
       return next;
     });
   };
+  const focusCleanupItem = (item: CleanupItem) => {
+    setQuery("");
+    setRiskFilter("all");
+    setDecisionFilter("all");
+    setCategoryFilter(item.category);
+    setVisibleLimit((current) => Math.max(current, 120));
+    setExpanded((current) => new Set(current).add(item.id));
+  };
 
   return (
     <div className="feature-page clean-deep-page">
@@ -1063,15 +1489,80 @@ function CleanPage({
           <p>{report ? statusText(report) : "Scan folder cache, folder sampah, dev artifact, advisory disk hog, dan target manual dalam satu laporan audit."}</p>
         </div>
         <div className="row-buttons">
+          <div className="engine-switch cleanup-engine-switch" role="radiogroup" aria-label="Metode scan cleanup">
+            {scanEngineOptions.map((option) => (
+              <button
+                aria-checked={scanEngine === option.id}
+                className={scanEngine === option.id ? "active" : ""}
+                disabled={loading || !!scanJob || !!deleteJob}
+                key={option.id}
+                onClick={() => setScanEngine(option.id)}
+                role="radio"
+                title={option.detail}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           {report && <button className="button ghost" onClick={() => void exportReport("export_cleanup_detail", true)}><ButtonIcon icon={FolderOpen} />Buka Analyzer</button>}
-          <button className="button primary" disabled={loading} onClick={scan}>
+          <button className="button primary" disabled={loading || !!deleteJob} onClick={scan}>
             <ButtonIcon icon={loading ? Loader2 : Search} />
             {loading ? "Memindai..." : "Pindai Deep Cleanup"}
           </button>
         </div>
       </div>
       <ErrorBanner message={error} />
-      {!report && <Panel><EmptyState>Mulai pemindaian untuk melihat folder cache, Windows Temp, dev cache, shader cache, Downloads review, dan advisory disk hog.</EmptyState></Panel>}
+      <div className="feature-strip cleanup-scope-strip">
+        {cleanupScopes.map((group, index) => (
+          <div className="scope-card" key={group.join("-")}>
+            <strong>{["Temp", "Browser", "Developer", "App Cache", "Windows"][index]}</strong>
+            <small>{group.join(" / ")}</small>
+          </div>
+        ))}
+      </div>
+      {scanEngine === "wiztree" && (
+        <WizTreeStatusPanel
+          status={wizTree.status}
+          loading={wizTree.loading}
+          installing={wizTree.installing}
+          verifying={wizTree.verifying}
+          error={wizTree.error}
+          onRefresh={() => void wizTree.refresh()}
+          onVerify={() => void wizTree.verify()}
+          onInstall={() => void wizTree.install()}
+        />
+      )}
+      {loading && (
+        <ScanProgressPanel
+          title={`Menganalisis folder cache dan sampah (${scanJob?.engine ?? scanEngineOptions.find((item) => item.id === scanEngine)?.label})`}
+          detail={scanProgress?.currentPath ?? "LeoDisk sedang menghitung ukuran, akses terbatas, dan kandidat aman sebelum daftar ditampilkan."}
+          phase={scanProgress?.phase ?? (scanEngine === "wiztree" ? "Menyiapkan proses WizTree" : "Membaca struktur folder")}
+          stats={[
+            ["Proses", scanProgress?.phase ?? "Memulai"],
+            ["Durasi", formatElapsed(scanProgress?.elapsedMs)],
+            ["Root", scanProgress?.rootsScanned ?? 0],
+            ["Folder", scanProgress?.foldersScanned ?? 0],
+            ["File", scanProgress?.filesScanned ?? 0],
+            ["Ukuran", formatBytes(scanProgress?.bytesScanned)],
+            ["Skipped", scanProgress?.skippedCount ?? 0],
+          ]}
+          action={scanJob && <button className="button ghost compact" onClick={() => void cancelScan()}><ButtonIcon icon={X} />Batalkan</button>}
+        />
+      )}
+      {deleteJob && (
+        <ScanProgressPanel
+          title="Membersihkan item terpilih"
+          detail={deleteProgress?.currentPath ?? "LeoDisk sedang memindahkan atau menghapus item terpilih di background."}
+          value={deleteProgress?.totalItems ? Math.round((deleteProgress.processedItems / deleteProgress.totalItems) * 100) : undefined}
+          stats={[
+            ["Selesai", `${deleteProgress?.processedItems ?? 0}/${deleteProgress?.totalItems ?? deletingIds.current.size}`],
+            ["Dihapus", deleteProgress?.affectedCount ?? 0],
+            ["Bersih", formatBytes(deleteProgress?.reclaimedBytes)],
+            ["Skipped", deleteProgress?.skippedCount ?? 0],
+          ]}
+        />
+      )}
+      {!report && !loading && <Panel><EmptyState>Mulai pemindaian untuk melihat folder cache, Windows Temp, dev cache, shader cache, Downloads review, dan advisory disk hog.</EmptyState></Panel>}
       {report && (
         <>
           <Panel className="critical-panel" title="STATUS" accent={summary?.cleanableBytes ? "amber" : "mint"} tag={report.scanFinishedAt ? `Scan selesai: ${report.scanFinishedAt}` : "Selesai"}>
@@ -1083,6 +1574,8 @@ function CleanPage({
               <span><strong>{summary?.accessLimited}</strong>Akses Terbatas</span>
               <span><strong>{summary?.skipped}</strong>Item Terlewati</span>
               <span><strong>{summary?.advisoryCount}</strong>Advisory</span>
+              <span><strong>{report.scanEngine ?? "Native"}</strong>Engine Scan</span>
+              {report.cachePath && <span><strong>CSV Cache</strong>{report.cachePath}</span>}
             </div>
             <div className="panel-actions">
               <span>Export audit tanpa scan ulang</span>
@@ -1103,6 +1596,11 @@ function CleanPage({
             report={report}
             selectedCategory={categoryFilter}
             onSelectCategory={(category) => setCategoryFilter((current) => current === category ? "" : category)}
+          />
+          <CleanupItemGraph
+            items={allItems}
+            onFocus={focusCleanupItem}
+            onOpen={openLocation}
           />
           <div className="cleanup-priority-grid">
             <Panel title="PRIORITAS AMAN TERBESAR" accent="mint" tag={`${cleanTop.length} kandidat teratas`}>
@@ -1227,7 +1725,7 @@ function CleanPage({
                     <input
                       aria-label={`Pilih ${item.name ?? item.category}`}
                       type="checkbox"
-                      disabled={!selectable}
+                      disabled={!selectable || !!deleteJob}
                       checked={selected.has(item.id)}
                       onChange={() => {
                         if (!selectable) return;
@@ -1278,15 +1776,15 @@ function CleanPage({
             </div>
             <div className="panel-actions">
               <span>{selectedCleanItems.length} clean + {selectedAdminItems.length} admin dipilih - {formatBytes(selectedBytes)} - {reviewed.size} sudah dicek</span>
-              <button className="button ghost compact" disabled={!cleanIds.length} onClick={() => selectIds(cleanIds)}><ButtonIcon icon={ShieldCheck} />Pilih semua Clean</button>
-              <button className="button ghost compact" disabled={!filteredCleanIds.length} onClick={() => selectIds(filteredCleanIds)}><ButtonIcon icon={Check} />Pilih Clean terfilter</button>
-              <button className="button ghost compact" disabled={!selected.size} onClick={() => setSelected(new Set())}><ButtonIcon icon={X} />Unselect all</button>
-              <button className="button danger" disabled={!selected.size} onClick={() => {
+              <button className="button ghost compact" disabled={!cleanIds.length || !!deleteJob} onClick={() => selectIds(cleanIds)}><ButtonIcon icon={ShieldCheck} />Pilih semua Clean</button>
+              <button className="button ghost compact" disabled={!filteredCleanIds.length || !!deleteJob} onClick={() => selectIds(filteredCleanIds)}><ButtonIcon icon={Check} />Pilih Clean terfilter</button>
+              <button className="button ghost compact" disabled={!selected.size || !!deleteJob} onClick={() => setSelected(new Set())}><ButtonIcon icon={X} />Unselect all</button>
+              <button className="button danger" disabled={!selected.size || !!deleteJob || loading} onClick={() => {
                 setAdminPhrase("");
                 setConfirming(true);
               }}>
                 <ButtonIcon icon={Trash2} />
-                Hapus item terpilih
+                {deleteJob ? "Menghapus..." : "Hapus item terpilih"}
               </button>
             </div>
           </Panel>
@@ -1405,7 +1903,14 @@ function PurgePage({ notify }: { notify: (message: string) => void }) {
         </div>
       </div>
       <ErrorBanner message={error} />
-      {!report && (
+      {loading && (
+        <ScanProgressPanel
+          title={loading === "installers" ? "Mencari installer besar" : loading === "folder" ? "Memindai folder proyek" : "Mencari artefak proyek"}
+          detail="LeoDisk sedang menghitung dependency, build output, virtualenv, cache proyek, dan kandidat installer."
+          stats={[["Mode", loading], ["Status", "Memindai"]]}
+        />
+      )}
+      {!report && !loading && (
         <Panel>
           <EmptyState>Pilih folder proyek atau scan lokasi umum untuk mencari artefak yang bisa dibuat ulang.</EmptyState>
         </Panel>
@@ -1590,10 +2095,25 @@ function AppsPage({ active, notify }: { active: boolean; notify: (message: strin
           <input className="search" placeholder="Cari aplikasi" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
       </div>
+      <div className="feature-strip remnant-scope-strip">
+        {remnantScopes.map((group) => (
+          <div className="scope-card" key={group.join("-")}>
+            <strong>{group[0]}</strong>
+            <small>{group.slice(1).join(" / ")}</small>
+          </div>
+        ))}
+      </div>
       <ErrorBanner message={error} />
+      {(loading || remnantsLoading || measuring) && (
+        <ScanProgressPanel
+          title={loading ? "Memuat daftar aplikasi" : remnantsLoading ? "Mencari sisa uninstall" : "Mengukur folder instalasi"}
+          detail={loading ? "LeoDisk membaca registry uninstall Windows." : remnantsLoading ? "Memeriksa AppData, ProgramData, cache, logs, config, dan extension/plugin." : "Menghitung ukuran folder aplikasi dan file yang tidak bisa dibaca."}
+          stats={[["Aplikasi", selectedApp?.name ?? "Semua"], ["Status", loading ? "Memuat" : "Memindai"]]}
+        />
+      )}
       <div className="apps-layout">
         <section className="apps-list">
-          {loading && <EmptyState>Memuat aplikasi terpasang...</EmptyState>}
+          {loading && <EmptyState>Menyiapkan daftar aplikasi...</EmptyState>}
           {!loading && filtered.map((app) => (
             <button className={`app-card-row ${selectedApp?.id === app.id ? "selected" : ""}`} key={app.id} onClick={() => selectApp(app)}>
               <span className="app-icon">{app.name.charAt(0).toUpperCase()}</span>
@@ -1739,6 +2259,14 @@ type ScanStatus = {
   error?: string;
 };
 
+type CleanupStatus = {
+  scanJob?: ScanJob;
+  scanProgress?: CleanupScanProgress;
+  deleteJob?: ScanJob;
+  deleteProgress?: CleanupDeleteProgress;
+  error?: string;
+};
+
 function fileCategoryLabel(path: string) {
   const lower = path.toLowerCase();
   if (/\.(mp4|mkv|mov|avi|webm|wmv)$/.test(lower)) return "Video";
@@ -1776,7 +2304,7 @@ function StorageCategoryChart({
     <Panel title="GRAFIK STORAGE" accent="blue" tag={selected || "Semua kategori"}>
       <div className="storage-chart-layout">
         <div className="chart-box compact-chart">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180}>
             <PieChart>
               <Pie data={data} dataKey="value" nameKey="name" innerRadius={48} outerRadius={84} paddingAngle={3}>
                 {data.map((entry, index) => (
@@ -1806,6 +2334,51 @@ function StorageCategoryChart({
   );
 }
 
+function FolderSizeGraph({
+  folders,
+  onFocus,
+  onOpen,
+}: {
+  folders: DiskFolder[];
+  onFocus: (folder: DiskFolder) => void;
+  onOpen: (locationId: string) => void;
+}) {
+  const topFolders = folders.slice(0, 12);
+  const maxSize = Math.max(...topFolders.map((folder) => folder.sizeBytes), 1);
+  return (
+    <Panel title="GRAPH FOLDER INTERAKTIF" accent="amber" tag={`${topFolders.length} folder terbesar`}>
+      <div className="folder-graph">
+        {topFolders.map((folder, index) => {
+          const percent = Math.max(4, (folder.sizeBytes / maxSize) * 100);
+          return (
+            <article className="folder-graph-row" key={folder.path}>
+              <button
+                className="folder-graph-track"
+                onClick={() => onFocus(folder)}
+                style={{ "--bar": `${percent}%` } as CSSProperties}
+              >
+                <span className="folder-graph-rank">{String(index + 1).padStart(2, "0")}</span>
+                <span className="folder-graph-name">
+                  <strong>{folder.name}</strong>
+                  <small>{folder.parentPath || folder.path}</small>
+                </span>
+                <span className="folder-graph-size">
+                  <strong>{formatBytes(folder.sizeBytes)}</strong>
+                  <small>{folder.fileCount} file</small>
+                </span>
+              </button>
+              <button className="text-action folder-graph-open" onClick={() => onOpen(folder.locationId)}>
+                Buka
+              </button>
+            </article>
+          );
+        })}
+        {!topFolders.length && <EmptyState>Belum ada folder besar yang bisa dibuat graph.</EmptyState>}
+      </div>
+    </Panel>
+  );
+}
+
 function AnalyzePage({
   active,
   notify,
@@ -1822,6 +2395,7 @@ function AnalyzePage({
   const [job, setJob] = useState<ScanJob>();
   const [progress, setProgress] = useState<DiskScanProgress>();
   const [result, setResult] = useState<DiskScanResult>();
+  const [scanEngine, setScanEngine] = useState<DiskScanEngineId>("native");
   const [analyzerTabs, setAnalyzerTabs] = useState(defaultAnalyzerTabs);
   const [analyzerTab, setAnalyzerTab] = useState(defaultAnalyzerTabs[0].id);
   const [storageCategoryFilter, setStorageCategoryFilter] = useState("");
@@ -1830,6 +2404,7 @@ function AnalyzePage({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string>();
+  const wizTree = useWizTreeTools(notify);
   const activeJobId = useRef<string | undefined>(undefined);
   const acceptingStartEvents = useRef(false);
   const pendingProgress = useRef<DiskScanProgress | undefined>(undefined);
@@ -1968,7 +2543,7 @@ function AnalyzePage({
     pendingResult.current = undefined;
     pendingError.current = undefined;
     try {
-      const nextJob = await invoke<ScanJob>("start_disk_scan", { root });
+      const nextJob = await invoke<ScanJob>("start_disk_scan", { root, scanEngine });
       activeJobId.current = nextJob.jobId;
       setJob(nextJob);
       const completed = readPendingResult();
@@ -2114,12 +2689,39 @@ function AnalyzePage({
             </span>
           ))}
         </div>
+        <div className="engine-switch" role="radiogroup" aria-label="Metode scan">
+          {scanEngineOptions.map((option) => (
+            <button
+              aria-checked={scanEngine === option.id}
+              className={scanEngine === option.id ? "active" : ""}
+              disabled={busy}
+              key={option.id}
+              onClick={() => setScanEngine(option.id)}
+              role="radio"
+              title={option.detail}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <div className="row-buttons">
           <button className="button ghost" disabled={busy || !listenersReady} onClick={() => void choose()}>Pilih lokasi</button>
           {result && <button className="button ghost" onClick={() => void openLocation(result.rootLocationId)}>Buka root</button>}
           {job && <button className="button danger" onClick={() => void cancel()}>Batalkan</button>}
         </div>
       </div>
+      {scanEngine === "wiztree" && (
+        <WizTreeStatusPanel
+          status={wizTree.status}
+          loading={wizTree.loading}
+          installing={wizTree.installing}
+          verifying={wizTree.verifying}
+          error={wizTree.error}
+          onRefresh={() => void wizTree.refresh()}
+          onVerify={() => void wizTree.verify()}
+          onInstall={() => void wizTree.install()}
+        />
+      )}
       <ErrorBanner message={error} />
       {dropActive && (
         <div className="drop-overlay" role="status">
@@ -2166,12 +2768,16 @@ function AnalyzePage({
         </>
       )}
       {job && (
-        <Panel title="PEMINDAIAN BERJALAN" accent="blue" tag={formatBytes(progress?.bytesScanned ?? 0)}>
-          <div className="scan-current">{progress?.currentPath || job.root}</div>
-          <p className="muted">
-            {progress?.filesScanned ?? 0} file dibaca - {progress?.foldersScanned ?? 0} folder - {progress?.inaccessible ?? 0} dilewati
-          </p>
-        </Panel>
+        <ScanProgressPanel
+          title={`Membangun peta ukuran folder (${job.engine})`}
+          detail={progress?.currentPath || job.root}
+          stats={[
+            ["Terbaca", formatBytes(progress?.bytesScanned ?? 0)],
+            ["File", progress?.filesScanned ?? 0],
+            ["Folder", progress?.foldersScanned ?? 0],
+            ["Dilewati", progress?.inaccessible ?? 0],
+          ]}
+        />
       )}
       {result && (
         <>
@@ -2182,7 +2788,8 @@ function AnalyzePage({
               <span><strong>{formatBytes(result.categories.find((item) => item.label.includes("Dokumen"))?.sizeBytes ?? 0)}</strong>Personal Data</span>
               <span><strong>{formatBytes(result.largestFiles.reduce((sum, file) => sum + file.sizeBytes, 0))}</strong>Large Files</span>
               <span><strong>{result.folders.length}</strong>Node Tertangkap</span>
-              <span><strong>Fallback</strong>Admin Accel</span>
+              <span><strong>{result.engine}</strong>Engine Scan</span>
+              {result.cachePath && <span><strong>CSV Cache</strong>{result.cachePath}</span>}
               <span><strong>{volumes.length}</strong>Volumes</span>
               <span><strong>{result.inaccessible}</strong>Inaccessible</span>
             </div>
@@ -2204,6 +2811,7 @@ function AnalyzePage({
               </DndContext>
             </div>
           </Panel>
+          <FolderSizeGraph folders={result.folders} onFocus={focusFolder} onOpen={openLocation} />
           <div className="analyze-layout">
             <aside className="disk-sidebar">
               <div className="disk-orb" />
@@ -2339,6 +2947,7 @@ function App() {
   const [latestCleanup, setLatestCleanup] = useState<CleanupReport>();
   const [toast, setToast] = useState<string>();
   const [scanStatus, setScanStatus] = useState<ScanStatus>({});
+  const [cleanupStatus, setCleanupStatus] = useState<CleanupStatus>({});
   const currentLabel = useMemo(() => navTabs.find((item) => item.id === tab)?.label, [navTabs, tab]);
   const sortableSensors = useSortableSensors();
   const notify = (message: string) => {
@@ -2349,6 +2958,15 @@ function App() {
     if (!scanStatus.job) return;
     try {
       const report = await invoke<ActionReport>("cancel_disk_scan", { jobId: scanStatus.job.jobId });
+      notify(report.message);
+    } catch (cancelError) {
+      notify(messageOf(cancelError));
+    }
+  };
+  const cancelActiveCleanupScan = async () => {
+    if (!cleanupStatus.scanJob) return;
+    try {
+      const report = await invoke<ActionReport>("cancel_cleanup_scan", { jobId: cleanupStatus.scanJob.jobId });
       notify(report.message);
     } catch (cancelError) {
       notify(messageOf(cancelError));
@@ -2390,8 +3008,21 @@ function App() {
             {scanStatus.job && (
               <div className="scan-chip" role="status">
                 <button className="text-action" onClick={() => setTab("analyze")}>Scan: {scanStatus.job.root}</button>
-                <span>{scanStatus.progress?.filesScanned ?? 0} file</span>
+                <span>{scanStatus.job.engine} - {scanStatus.progress?.filesScanned ?? 0} file</span>
                 <button className="text-action" onClick={() => void cancelActiveScan()}>Batalkan</button>
+              </div>
+            )}
+            {(cleanupStatus.scanJob || cleanupStatus.deleteJob) && (
+              <div className="scan-chip cleanup-chip" role="status">
+                <button className="text-action" onClick={() => setTab("clean")}>
+                  {cleanupStatus.deleteJob ? "Clean: menghapus" : "Clean: scan"}
+                </button>
+                <span>
+                  {cleanupStatus.deleteJob
+                    ? `${cleanupStatus.deleteProgress?.processedItems ?? 0}/${cleanupStatus.deleteProgress?.totalItems ?? 0} item`
+                    : `${cleanupStatus.scanProgress?.filesScanned ?? 0} file`}
+                </span>
+                {cleanupStatus.scanJob && <button className="text-action" onClick={() => void cancelActiveCleanupScan()}>Batalkan</button>}
               </div>
             )}
           </div>
@@ -2399,7 +3030,7 @@ function App() {
         <div className="workspace">
           {tab === "status" && <StatusPage active latestCleanup={latestCleanup} />}
           <div hidden={tab !== "clean"}>
-            <CleanPage onReport={setLatestCleanup} notify={notify} />
+            <CleanPage onReport={setLatestCleanup} onStatus={setCleanupStatus} notify={notify} />
           </div>
           {tab === "purge" && <PurgePage notify={notify} />}
           {tab === "apps" && <AppsPage active notify={notify} />}

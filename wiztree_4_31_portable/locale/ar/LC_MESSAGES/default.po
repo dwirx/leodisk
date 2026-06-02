@@ -1,0 +1,886 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: عثمان مُداعس - Othman Ali Modaes <othman2003ye@gmail.com>\n"
+"Language-Team: \n"
+"Language: ar_YE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.5\n"
+
+#: WizTreeMain.pas:673
+msgid "Scanning..."
+msgstr "جارِ التحليل..."
+
+#: WizTreeMain.pas:673 WizTreeMain.pas:4286
+msgid "Folders"
+msgstr "المجلدات"
+
+#: WizTreeMain.pas:673 WizTreeMain.pas:4283
+msgid "Files"
+msgstr "الملفات"
+
+#: WizTreeMain.pas:688
+msgid "Dumping file"
+msgstr "حفظ الملف"
+
+#: WizTreeMain.pas:688 WizTreeMain.pas:953
+msgid "MB"
+msgstr ""
+
+#: WizTreeMain.pas:950
+msgid "GB"
+msgstr ""
+
+#: WizTreeMain.pas:956
+msgid "KB"
+msgstr ""
+
+#: WizTreeMain.pas:961
+msgid "Bytes"
+msgstr ""
+
+#: WizTreeMain.pas:1141
+msgid "Files in"
+msgstr "الملفات في"
+
+#: WizTreeMain.pas:1143
+msgid "File in"
+msgstr "الملف في"
+
+#: WizTreeMain.pas:1691 WizTreeMain.pas:1738
+msgid "Selected Files"
+msgstr "الملفات المحدّدة"
+
+#: WizTreeMain.pas:1875
+msgid "Command Prompt windows - are you sure?"
+msgstr "نافذة موجه الأوامر - هل أنت متأكد؟"
+
+#: WizTreeMain.pas:1977
+msgid "Explorer windows - are you sure?"
+msgstr "مستكشف الملفات - هل أنت متأكد؟"
+
+#: WizTreeMain.pas:2034
+msgid "files - are you sure?"
+msgstr "الملفات - هل أنت متأكد؟"
+
+#. FileName := FDir;
+#. 2 = select directory
+#: WizTreeMain.pas:2147 WizTreeMain.pas:2162 WizTreeMain.pas:3041
+msgid "Select Folder"
+msgstr "اخ&تيار مجلد"
+
+#. YMMV
+#: WizTreeMain.pas:2149
+msgid "Select"
+msgstr "اختيار"
+
+#: WizTreeMain.pas:2202
+msgid "File not found"
+msgstr "الملف غير موجود"
+
+#: WizTreeMain.pas:2326
+msgid "Error"
+msgstr "خطأ"
+
+#: WizTreeMain.pas:2351
+msgid "Sorting file list..."
+msgstr "فرز قائمة الملفات..."
+
+#: WizTreeMain.pas:2362
+msgid "Loading tree..."
+msgstr "تحميل الشجرة..."
+
+#: WizTreeMain.pas:2406
+msgid "Scan complete in"
+msgstr "تم الانتهاء من التحليل خلال"
+
+#: WizTreeMain.pas:2408
+msgid "seconds"
+msgstr "ثوانٍ"
+
+#: WizTreeMain.pas:2412
+msgid "canceled"
+msgstr "تم الإلغاء"
+
+#: WizTreeMain.pas:2480
+msgid "Failed to update Windows Explorer context menu"
+msgstr "فشل الاندماج مع قائمة مستكشف الوندوز"
+
+#: WizTreeMain.pas:2560
+msgid "No MFT root found!"
+msgstr "لم يتم العثور على جذر MFT!"
+
+#. we have an update!
+#: WizTreeMain.pas:2640
+msgid "An update is available"
+msgstr "هناك تحديث متاح"
+
+#: WizTreeMain.pas:2641
+msgid "Click on the \"View Update\" button to learn more."
+msgstr "انقر على \"عرض التحديث \" لمعرفة المزيد."
+
+#. if tag set then display error if any
+#: WizTreeMain.pas:2648
+msgid "No update found."
+msgstr "لم يتم العثور على تحديثات."
+
+#. if tag set then display error if any
+#: WizTreeMain.pas:2660
+msgid "Error checking for updates:"
+msgstr "خطأ عند البحث عن تحديثات:"
+
+#: WizTreeMain.pas:2836
+msgid "Please restart WizTree as Administrator to dump the MFT file"
+msgstr "لحفظ ملف جدول القرص MFT يجب إعادة تشغيل البرنامج كمسؤول"
+
+#: WizTreeMain.pas:2844
+msgid "Please select an NTFS formatted drive."
+msgstr "يجب اختيار قرص مهيأ بنظام الملفات NTFS."
+
+#: WizTreeMain.pas:2869
+msgid "Dumping MFT file, please wait..."
+msgstr "يتم حفظ ملف جدول القرص MFT، يرجى الانتظار..."
+
+#: WizTreeMain.pas:2880
+msgid "MFT data dump complete."
+msgstr "تم حفظ ملف جدول القرص MFT."
+
+#: WizTreeMain.pas:2884
+msgid "MFT data dumped to file"
+msgstr "تم حفظ بيانات MFT إلى ملف"
+
+#: WizTreeMain.pas:2991
+msgid "64 bit"
+msgstr ""
+
+#: WizTreeMain.pas:2993
+msgid "32 bit"
+msgstr ""
+
+#: WizTreeMain.pas:3042
+msgid "MFT file"
+msgstr "ملف جدول القرص MFT"
+
+#: WizTreeMain.pas:3487
+msgid "Loading file list..."
+msgstr "تحميل قائمة الملفات..."
+
+#: WizTreeMain.pas:3592
+msgid "files"
+msgstr "ملفات"
+
+#. lblTotalSpacePerc.Caption := '';
+#: WizTreeMain.pas:3636 WizTreeMain.pas:3637 WizTreeMain.pas:3658
+#: WizTreeMain.pas:3663 WizTreeMain.pas:3666 WizTreeMain.pas:3674
+#: WizTreeMain.pas:3675 WizTreeMain.pas:3677 WizTreeMain.pas:3679
+#: WizTreeMain.pas:3681 WizTreeMain.pas:4268 WizTreeMain.pas:4269
+#: WizTreeMain.pas:4270 WizTreeMain.pas:4271 WizTreeMain.pas:4272
+#: WizTreeMain.pas:4273 WizTreeMain.pas:4274
+msgid "n/a"
+msgstr ""
+
+#: WizTreeMain.pas:3648
+msgid "<Folder>"
+msgstr "<مجلدات>"
+
+#: WizTreeMain.pas:4228
+msgid "File"
+msgstr "&ملف"
+
+#: WizTreeMain.pas:4229
+msgid "Options"
+msgstr "&خيارات"
+
+#: WizTreeMain.pas:4230 WizTreeMain.pas:4260
+msgid "Scan"
+msgstr "&تحليل"
+
+#: WizTreeMain.pas:4231
+msgid "New Instance"
+msgstr "&نافذة جديدة"
+
+#: WizTreeMain.pas:4232
+msgid "Explore Folder"
+msgstr "&تصفح المجلد"
+
+#: WizTreeMain.pas:4233
+msgid "Command Prompt Here"
+msgstr "&تشغيل موجه الأوامر هنا"
+
+#: WizTreeMain.pas:4234
+msgid "Copy Path"
+msgstr "&نسخ المسار"
+
+#: WizTreeMain.pas:4235
+msgid "Delete (to Recycle Bin)"
+msgstr "&نقل إلى سلة المحذوفات"
+
+#: WizTreeMain.pas:4236
+msgid "Delete (No undelete possible)"
+msgstr "&حذف نهائي"
+
+#: WizTreeMain.pas:4237
+msgid "Dump MFT File"
+msgstr "&حفظ ملف جدول القرص MFT"
+
+#: WizTreeMain.pas:4238
+msgid "Exit"
+msgstr "&خروج"
+
+#: WizTreeMain.pas:4240
+msgid "Display Dynamic values"
+msgstr "&استخدام وحدة حجم تلقائية"
+
+#: WizTreeMain.pas:4241
+msgid "Display Byte values"
+msgstr "&استخدام وحدة الحجم Byte"
+
+#: WizTreeMain.pas:4242
+msgid "Display KB values"
+msgstr "&استخدام وحدة الحجم KB"
+
+#: WizTreeMain.pas:4243
+msgid "Display MB values"
+msgstr "&استخدام وحدة الحجم MB"
+
+#: WizTreeMain.pas:4244
+msgid "Display GB values"
+msgstr "&استخدام وحدة الحجم GB"
+
+#: WizTreeMain.pas:4245
+msgid "Windows Explorer context menu"
+msgstr "&قائمة سياق مستكشف الوندوز"
+
+#: WizTreeMain.pas:4246
+msgid "Always Run as Administrator"
+msgstr "&تشغيل البرنامج كمسؤول تلقائيًا"
+
+#: WizTreeMain.pas:4248
+msgid "Language"
+msgstr "الل&غة"
+
+#: WizTreeMain.pas:4250
+msgid "Restart as Administrator"
+msgstr "&إعادة تشغيل كمسؤول"
+
+#: WizTreeMain.pas:4251
+msgid "WizTree requires \"Administrator\" rights to enable high speed scanning of NTFS hard drives and to access all system files and folders. Click on the \"Restart as Administrator\" button to enable Administrator rights."
+msgstr "يتطلب WizTree صلاحيات \"المسؤول\" لتمكين التحليل عالي السرعة لمحركات الأقراص الثابتة NTFS وللوصول إلى كافة ملفات النظام ومجلداته. انقر فوق الزر \"إعادة التشغيل كمسؤول\" لتمكين صلاحيات المسؤول."
+
+#: WizTreeMain.pas:4252
+msgid "Don't show this again"
+msgstr "&لا تعرض هذا مرة أخرى"
+
+#: WizTreeMain.pas:4254
+msgid "View Update"
+msgstr "&عرض التحديثات"
+
+#: WizTreeMain.pas:4255
+msgid "Dismiss"
+msgstr "&تجاهل"
+
+#: WizTreeMain.pas:4256
+msgid "Check for updates"
+msgstr "تفعيل &البحث التلقائي عن التحديثات"
+
+#: WizTreeMain.pas:4257
+msgid "Check for updates now"
+msgstr "&بحث عن تحديثات الآن"
+
+#: WizTreeMain.pas:4259
+msgid "Select:"
+msgstr "القرص:"
+
+#: WizTreeMain.pas:4261
+msgid "Cancel"
+msgstr "إلغاء"
+
+#: WizTreeMain.pas:4262
+msgid "Ready..."
+msgstr "استعداد..."
+
+#: WizTreeMain.pas:4263
+msgid "Selection:"
+msgstr "التحديد"
+
+#: WizTreeMain.pas:4264
+msgid "Total Space:"
+msgstr "إجمالي المساحة:"
+
+#: WizTreeMain.pas:4265
+msgid "Space Used:"
+msgstr "المساحة المستخدمة:"
+
+#: WizTreeMain.pas:4266
+msgid "Space Free:"
+msgstr "المساحة الفارغة:"
+
+#: WizTreeMain.pas:4276
+msgid "Help us make WizTree better!"
+msgstr "ساعدنا في جعل التطبيق أفضل!"
+
+#: WizTreeMain.pas:4278
+msgid "Tree View"
+msgstr "عرض كشجرة"
+
+#: WizTreeMain.pas:4280
+msgid "Folder"
+msgstr "عرض المجلد"
+
+#: WizTreeMain.pas:4281
+msgid "Percent of Parent"
+msgstr "% من الأصل"
+
+#: WizTreeMain.pas:4282 WizTreeMain.pas:4307
+msgid "Size"
+msgstr "الحجم"
+
+#: WizTreeMain.pas:4284 WizTreeMain.pas:4308
+msgid "Modified"
+msgstr "تأريخ التعديل"
+
+#: WizTreeMain.pas:4285 WizTreeMain.pas:4309
+msgid "Attributes"
+msgstr "الخصائص"
+
+#: WizTreeMain.pas:4287
+msgid "Items"
+msgstr "العناصر"
+
+#: WizTreeMain.pas:4288 WizTreeMain.pas:4310
+msgid "Allocated"
+msgstr "المساحة المحجوزة"
+
+#: WizTreeMain.pas:4290
+msgid "File View"
+msgstr "عرض كمجلدات"
+
+#: WizTreeMain.pas:4292
+msgid "File Search Filter:"
+msgstr "تصفية نتائج البحث:"
+
+#: WizTreeMain.pas:4293
+msgid "Clear"
+msgstr "مسح"
+
+#: WizTreeMain.pas:4294
+msgid "Match file name only"
+msgstr "مطابقة اسم الملف فقط"
+
+#: WizTreeMain.pas:4295
+msgid "(Fast)"
+msgstr "(سريع)"
+
+#: WizTreeMain.pas:4296
+msgid "Match entire path"
+msgstr "مطابقة المسار كاملًا"
+
+#: WizTreeMain.pas:4297
+msgid "(Warning: can be slow!)"
+msgstr "(تحذير: قد يكون هذا بطيئًا!)"
+
+#: WizTreeMain.pas:4298
+msgid "Max files to display:"
+msgstr "عدد الملفات المعروضة:"
+
+#: WizTreeMain.pas:4300
+msgid "(Selecting ALL can be very slow!)"
+msgstr "(عرض الكل قد يكون بطيئًا للغاية!)"
+
+#: WizTreeMain.pas:4301
+msgid "ALL"
+msgstr "الكل"
+
+#: WizTreeMain.pas:4303
+msgid "Total Files:"
+msgstr "إجمالي الملفات:"
+
+#: WizTreeMain.pas:4305
+msgid "File Name"
+msgstr "اسم الملف"
+
+#: WizTreeMain.pas:4306
+msgid "Percent of Drive"
+msgstr "% من القرص"
+
+#: WizTreeMain.pas:4312
+msgid "About"
+msgstr "عن البرنامج"
+
+#: WizTreeMain.pas:4314
+msgid "If you use WizTree commercially or you'd just like to support the freeware community then please make a donation by clicking on the Donate button at the top right of the screen. Thank you! :)"
+msgstr "إذا كنت تستخدم البرنامج تجاريًا أو تريد أن تدعم مجتمع البرامج المجانيّة نرجوا منك التبرع بواسطة النقر على زر التبرع في أعلى النافذة، شكرًا لك :)"
+
+#: WizTreeMain.pas:4316
+msgid "What is WizTree?"
+msgstr "ما هو WizTree؟"
+
+#: WizTreeMain.pas:4317
+msgid "WizTree is the world's fastest disk space analyzer. It scans your hard drive and shows you which files and folders are using the most disk space."
+msgstr "هذا التطبيق هو على الأرجح أسرع محلّل أقراص على الإطلاق. يقوم بتحليل وحدات التخزين ويعرض لك أي الملفات والمجلدات أكثر استهلاكًا لمساحة التخزين."
+
+#: WizTreeMain.pas:4318
+msgid "It does this in the FASTEST way possible - you simply won't find any other application of this type that's quicker! Use the information WizTree provides to quickly locate and remove \"space hogs\" from your hard drive."
+msgstr "يؤدي البرنامج عمله بأسرع ما يمكن - لا يمكنك ببساطة أن تجد برنامجًا يقوم بذلك بهذه السرعة. استخدم المعلومات التي يزودك بها هذا البرنامج لاكتشاف وحذف \"آكلات المساحة\" من وحدة التخزين الخاصة بك."
+
+#: WizTreeMain.pas:4320
+msgid "WARNING: Take care not to remove any files that are required for the correct operation of your PC!"
+msgstr "تحذير: انتبه عند حذف الملفات وتجنب الملفات المهمة لك أو لنظام التشغيل!"
+
+#: WizTreeMain.pas:4322
+msgid "What makes WizTree so fast?"
+msgstr "ما الذي يجعل WizTree سريعًا؟"
+
+#: WizTreeMain.pas:4324
+msgid "When scanning NTFS formatted hard drives (most modern hard drives use this format), WizTree reads the hard drive's Master File Table (MFT) directly from the disk."
+msgstr "عند تحليل محركات الأقراص المهيئة بنظام الملفات NTFS (تستخدم معظم محركات الأقراص الثابتة الحديثة هذا التنسيق)، يقرأ WizTree جدول الملفات الرئيسية لمحرك الأقراص الثابتة (MFT) مباشرةً من القرص."
+
+#: WizTreeMain.pas:4325
+msgid "The MFT is a special hidden file used by the NTFS file system to keep track of all files and folders on a hard drive. Scanning for files this way completely bypasses the operating system (Windows) and provides a huge performance boost."
+msgstr "MFT هو ملف مخفي خاص يستخدمه نظام الملفات NTFS لتتبع كافة الملفات والمجلدات الموجودة على القرص الصلب. يتجاوز البحث عن الملفات بهذه الطريقة نظام التشغيل (ويندوز) تمامًا ويوفر تعزيزًا كبيرًا للأداء."
+
+#: WizTreeMain.pas:4327
+msgid "As of version 2.0, WizTree can now also scan non NTFS hard drives, network drives, USB drives, and individual directories."
+msgstr "اعتبارًا من الإصدار 2.0، يمكن لـهذا البرنامج فحص محركات الأقراص الثابتة ذات نظم الملفات الأخرى، ومحركات أقراص الشبكة، ومحركات أقراص المتنقلة، والمجلدات بشكل فردي."
+
+#: WizTreeMain.pas:4329
+msgid "Please visit the Antibody Software website for more great software, such as:"
+msgstr "يرجى زيارة موقنا على الوٍب للحصول على المزيد من البرامج الرائعة، مثل:"
+
+#: WizTreeMain.pas:4330 WizTreeMain.pas:4334
+msgid "(click for more information)"
+msgstr "(انقر لمزيد من المعلومات)"
+
+#: WizTreeMain.pas:4331
+msgid "A powerful yet easy to use web gallery downloading tool. It supports most of the popular image hosting sites (such as flickr, facebook, Google image search, imgur, deviantart etc.)."
+msgstr "أداة تنزيل ألبومات الصور من الويب قوية وسهلة الاستخدام. وهو يدعم معظم مواقع استضافة الصور الشهيرة (مثل flickr، facebook، Google image search، imgur، deviantart وغيرها)."
+
+#: WizTreeMain.pas:4332
+msgid "It doesn't require any complicated setup or project files - it just works."
+msgstr "لا يحتاج الأمر أي إعداد معقد أو ملفات مشروع - إنه يعمل ببساطة."
+
+#: SelectLanguage.pas:56 supportercode.pas:239
+msgid "OK"
+msgstr "حسنًا"
+
+#: supportercode.pas:143
+msgid "Invalid Key - Please try again."
+msgstr "مفتاح غير صالح - حاول ثانيةً."
+
+#: supportercode.pas:144
+msgid "It is recommended that you copy and paste your supporter code."
+msgstr "من المستحسن قيامك بنسخ رمز الداعمين ثم لصقه هنا."
+
+#: supportercode.pas:145
+msgid "Only use digits 0 to 9 and letters A to F."
+msgstr "استخدم الأعداد من 0 إلى 9 والحروف من A إلى F فقط."
+
+#: supportercode.pas:219 WizTreeMain.pas:6266
+msgid "Thank you for your support!"
+msgstr "شكرًا لدعمك!"
+
+#: supportercode.pas:220
+msgid "WizTree will now restart."
+msgstr "سيتم إعادة تشغيل البرنامج."
+
+#: supportercode.pas:241 WizTreeMain.pas:5286
+msgid "Enter Supporter Code"
+msgstr "إدخال رمز الداعم&ين"
+
+#: supportercode.pas:242
+msgid "Supporter Code"
+msgstr "رمز الداعمين"
+
+#. warning dialog title
+#: uVistaTaskDialog.pas:228
+msgid "Warning"
+msgstr "تحذير"
+
+#. confirmation dialog title
+#: uVistaTaskDialog.pas:233
+msgid "Confirmation"
+msgstr "التأكيد"
+
+#. information dialog title
+#: uVistaTaskDialog.pas:243
+msgid "Information"
+msgstr "معلومة"
+
+#: WizTreeMain.pas:1616
+msgid "(No Extension)"
+msgstr "(ليس هناك امتداد)"
+
+#: WizTreeMain.pas:5269
+msgid "File Type"
+msgstr "نوع الملف"
+
+#: WizTreeMain.pas:5272
+msgid "Percent"
+msgstr "النسبة"
+
+#: WizTreeMain.pas:5273
+msgid "Extension"
+msgstr "الامتداد"
+
+#: WizTreeMain.pas:5276
+msgid "MFT Dump"
+msgstr "حفظ ملف جدول القرص MFT"
+
+#: WizTreeMain.pas:5276
+msgid "All Files"
+msgstr "كل الملفات"
+
+#: WizTreeMain.pas:5277
+msgid "Show Treemap"
+msgstr "عرض الم&خطط الشجري"
+
+#: WizTreeMain.pas:5278
+msgid "Show File Types"
+msgstr "عرض نوع المل&ف"
+
+#: WizTreeMain.pas:5279
+msgid "Reset tree expansion"
+msgstr "استعادة تو&سيع الشجرة"
+
+#: WizTreeMain.pas:5281
+msgid "Select Parent"
+msgstr "اختيار المجلد الأ&صل"
+
+#: WizTreeMain.pas:5282
+msgid "Reselect Child"
+msgstr "إعادة اختيار العناصر الفر&عية"
+
+#: WizTreeMain.pas:5283
+msgid "Help support WizTree development by making a donation"
+msgstr "تبرَّع لتساعدنا في تطوير WizTree"
+
+#: WizTreeMain.pas:5284
+msgid "(You can hide the Donate button by making a donation)"
+msgstr "(يمكنك إزالة زر التبرّع عن طريق التبرّع)"
+
+#: WizTreeMain.pas:6883
+msgid "Show Allocated Size on Treemap"
+msgstr "عرض الم&ساحة المحجوزة على المخطط الشجري"
+
+#: WizTreeMain.pas:6884
+msgid "Auto scan after making selection"
+msgstr "تحليل تل&قائي عند تغيير القرص"
+
+#: WizTreeMain.pas:6886
+msgid "Zoom in Treemap"
+msgstr "ت&كبير المخطط الشجري"
+
+#: WizTreeMain.pas:6887
+msgid "Zoom out Treemap"
+msgstr "تص&غير المخطط الشجري"
+
+#: exporttreemap.pas:57 WizTreeMain.pas:7193
+msgid "Save Treemap Image as .png file"
+msgstr "حف&ظ صورة للمخطط الشجري"
+
+#: exporttreemap.pas:58
+msgid "Save"
+msgstr "حفظ"
+
+#: exporttreemap.pas:60
+msgid "Width"
+msgstr "العرض"
+
+#: exporttreemap.pas:61
+msgid "Height"
+msgstr "الارتفاع"
+
+#: exporttreemap.pas:62
+msgid "Shades of Gray (single color)"
+msgstr "ظلال رمادية (لون واحد)"
+
+#: WizTreeMain.pas:7191
+msgid "Show Free Space on Treemap"
+msgstr "عرض المساحة الفار&غة على المخطط الشجري"
+
+msgid "File already exists - overwrite?"
+msgstr "هناك ملف بنفس الاسم، هل تريد استبداله؟"
+
+#: WizTreeMain.pas:3002 WizTreeMain.pas:3217
+msgid "Generated by"
+msgstr "تم التوليد بواسطة"
+
+#: WizTreeMain.pas:3002 WizTreeMain.pas:3217
+msgid "You can hide this message by making a donation"
+msgstr "يتم إخفاء هذه الرسالة عند التبرّع"
+
+#: WizTreeMain.pas:4452
+msgid "MFT Dump cancelled..."
+msgstr "تم إلغاء تصدير ملف جدول القرص MFT..."
+
+#: WizTreeMain.pas
+msgid "Export complete."
+msgstr "تم التصدير."
+
+#: WizTreeMain.pas:7815
+msgid "Copy file and size info to clipboard"
+msgstr "نسخ &معلومات الملف"
+
+#: WizTreeMain.pas:7816
+msgid "Export to .CSV file"
+msgstr "تص&دير الفحص إلى ملف CSV"
+
+msgid "Colors"
+msgstr "الأل&وان"
+
+msgid "Default"
+msgstr "الافتراضي"
+
+msgid "Color Blind"
+msgstr "عمى الألوان"
+
+msgid "CSV file"
+msgstr "ملف CSV"
+
+msgid "Select CSV file"
+msgstr "اختر &ملف CSV"
+
+msgid "Failed to import CSV file"
+msgstr "فشل استيراد ملف CSV"
+
+msgid "Color By"
+msgstr "اللون بواسطة"
+
+msgid "Color"
+msgstr "اللون"
+
+msgid "File Extension(s)"
+msgstr "امتدادات الملفات"
+
+msgid "Export File Types to CSV file"
+msgstr "تصدير امتدادات الملفات إلى مل&ف CSV"
+
+msgid "Display TB values"
+msgstr "&استخدام وحدة الحجم TB"
+
+msgid "TB"
+msgstr "TB"
+
+msgid "UI Theme"
+msgstr "مظهر الواجهة"
+
+msgid "Auto"
+msgstr "تلقائي"
+
+msgid "Light"
+msgstr "فاتح"
+
+msgid "Dark"
+msgstr "داكن"
+
+msgid "Sorry, your supporter code is only valid for versions of WizTree with version date"
+msgstr "عذرًا، رمز الدعم الخاص بك صالح فقط لإصدارات WizTree ذات تاريخ الإصدار"
+
+msgid "or earlier."
+msgstr "أو أقدم."
+
+msgid "This version of WizTree has version date"
+msgstr "هذا الإصدار من WizTree له تاريخ الإصدار"
+
+msgid "Please install an older version of WizTree with a suitable version date, or purchase a new supporter code."
+msgstr "الرجاء تثبيت إصدار أقدم من WizTree بتاريخ إصدار مناسب، أو شراء رمز داعم جديد."
+
+msgid "Version Date:"
+msgstr "تأريخ الإصدار:"
+
+msgid "Supporter license"
+msgstr "رخصة الداعمين"
+
+msgid "Enterprise license"
+msgstr "رخصة المؤسسات"
+
+#: Displayed as X user license where is number
+msgid "user license"
+msgstr "رخصة المستخدم"
+
+msgid "Upgrades until:"
+msgstr "الترقيات حتى:"
+
+msgid "lifetime"
+msgstr "مدى الحياة"
+
+msgid "Supporter code not valid for this version"
+msgstr "رمز الداعمين ليس صالحًا لهذا الإصدار"
+
+msgid "Select Multiple"
+msgstr "اختيار مت&عدّد"
+
+msgid "Multiple"
+msgstr "متعدّد"
+
+msgid "Add Folder"
+msgstr "إضافة مجلد"
+
+msgid "Remove Folder"
+msgstr "حذف المجلد"
+
+msgid "is included within"
+msgstr "هل تم التضمين"
+
+msgid "They cannot both be selected."
+msgstr "لا يمكن اختيار كِلا الإثنين."
+
+msgid "Select All"
+msgstr "تحديد الكل"
+
+msgid "Select None"
+msgstr "إلغاء التحديد"
+
+msgid "Lifetime"
+msgstr "مدى الحياة"
+
+msgid "Show Folder and File Names on Treemap"
+msgstr "عرض أسماء الملفات والم&جلدات في المخطط الشجري"
+
+msgid "Filter Scan Results"
+msgstr "ت&صفية نتائج التحليل"
+
+msgid "Include Filter:"
+msgstr "تضمين في التصفية:"
+
+msgid "Exclude Filter:"
+msgstr "استثناء من التصفية:"
+
+msgid "Apply Filter"
+msgstr "تطبيق التصفية"
+
+msgid "Cut"
+msgstr "&قص"
+
+msgid "Copy"
+msgstr "نس&خ"
+
+msgid "Reset Configuration to default values"
+msgstr "استعادة القيم الافتراضية لجميع إعدادات الت&طبيق"
+
+msgid "Tweaks"
+msgstr "التف&ضيلات"
+
+msgid "Enable drag/drop"
+msgstr "تفعيل السحب ولإفلات"
+
+msgid "Open file on double click"
+msgstr "فتح الملف عند النقر المزدوج"
+
+msgid "Monitor file system for changes"
+msgstr "مراقبة التغييرات في نظام الملفات"
+
+msgid "Show max modified date of all sub folders/files as folder's last modified date"
+msgstr "استخدام أحدث تأريخ للملفات أو المجلدات الفرعية داخل أي مجلد كأحدث تأريخ للمجلد"
+
+msgid "Use WizTree classic theme"
+msgstr "استخدام المظهر العتيق"
+
+msgid "Show horizontal lines in grids"
+msgstr "عرض الخطوط الأفقية للشبكة"
+
+msgid "Alternate row colors"
+msgstr "جعل لون الصفوف متباينًا"
+
+msgid "Enable gradient colors in treemap"
+msgstr "تفعيل تدرّج الألوان في المخطط الشجري"
+
+msgid "Number of Decimal places to display"
+msgstr "عدد الخانات العشرية المعروضة"
+
+msgid "WizFile is an extremely rapid file finder application that uses methods similar to WizTree to rapidly index your hard drives. File search results are returned instantly as you type. WizFile provides a real time view of all files on your hard drives - any changes to the file search results will be updated in real time as they occur. It requires minimal CPU and RAM usage and has a negligible impact on the performance of your PC."
+msgstr "WizFile هو تطبيق سريع للغاية للبحث عن الملفات يستخدم أساليب مشابهة لـ WizTree لفهرسة محركات الأقراص الثابتة لديك بسرعة. يتم عرض نتائج البحث عن الملفات فورًا أثناء الكتابة داخل مربع البحث. يوفر WizFile عرضًا في الوقت الفعلي لجميع الملفات الموجودة على محركات الأقراص الثابتة لديك - وسيتم تحديث أي تغييرات على نتائج البحث عن الملفات حالًا عند حدوثها. فهو يستهلك قدرًا ضئيلًا من طاقة وحدة المعالجة المركزية وذاكرة الوصول العشوائي (RAM) وله تأثير ضئيل على أداء جهاز الكمبيوتر الخاص بك."
+
+msgid "Dup Count"
+msgstr "عدد المكررات"
+
+msgid "Dup Size"
+msgstr "حجم المكررات"
+
+msgid "Duplicate Files:"
+msgstr "الملفات المكررة:"
+
+msgid "Duplicates only"
+msgstr "عرض الملفات المكررة فقط"
+
+msgid "Don't locate duplicates"
+msgstr "لا تبحث عن الملفات المكررة"
+
+msgid "Locate by Name, Size"
+msgstr "اكتشاف بواسطة: الاسم والحجم"
+
+msgid "Locate by Name, Size, Date"
+msgstr "اكتشاف بواسطة: الاسم، الحجم والتأريخ"
+
+msgid "Path"
+msgstr "المسار"
+
+msgid "Scan MFT (if possible) when a folder is selected for analysis"
+msgstr "التحليل باستخدام MFT (إذا أمكن) عند اختيار مجلد لتحليله"
+
+msgid "Normally the MFT is only scanned when an entire drive is selected. This option can speed up the scanning of folders containing a large number of files, but can be slower for smaller folders."
+msgstr "في الوضع الطبيعي يتم استخدام MFT فقط عند تحليل محرك أقراص بكامله، هذا الخيار يسرّع تحليل المجلدات التي تحتوي عددًا كبيرًا من الملفات، لكنه قد يكون أبطأ إذا كان المجلد صغيرًا."
+
+msgid "Reserved Space:"
+msgstr "المساحة المحجوزة:"
+
+msgid "Expand All"
+msgstr "توسيع الكل"
+
+msgid "File group minimum size (set to 0 to disable file grouping)"
+msgstr "الحد الأدنى لحجم مجموعة الملف (جعلها 0 سوف يعطل التجميع)"
+
+msgid "Export"
+msgstr "تصدير"
+
+msgid "Export file name:"
+msgstr "اسم ملف التصدير:"
+
+msgid "Selection"
+msgstr "التحديد"
+
+msgid "Selected only"
+msgstr "المحدد فقط"
+
+msgid "Export drive size information"
+msgstr "تصدير معلومات حجم القرص"
+
+msgid "Export \"Last Accessed\" and \"Created\" dates"
+msgstr "تصدير تأريخيّ \"آخر وصول\" و \"تأريخ الإنشاء\""
+
+msgid "Export total size and allocated size of folders (excluding sub folders)"
+msgstr "تصدير الحجم الكلّي والحجم الفعلي للمجلدات (مع استثناء المجلدات الفرعية)"
+
+msgid "Split file names into root, folder, filename and extension"
+msgstr "تقسيم اسم الملف إلى جذر و مجلد وامتداد"
+
+msgid "Export percentage of parent value"
+msgstr "تصدير نسبة القيمة الأب"
+
+msgid "Max folder depth (0 = no limit):"
+msgstr "أكبر عمق للمجلد (0 = لا نهائي):"
+
+msgid "Export Files"
+msgstr "تصدير الملفات"
+
+msgid "Export Folders"
+msgstr "تصدير المجلدات"
+
+msgid "Either one or both of \"Export Files\" and \"Export Folders\" must be selected for the export to be valid."
+msgstr "يجب اختيار أحد خيارات التصدير أو كليهما ليكن التصدير صالحًا."
+
+msgid "Export MFT record number"
+msgstr "تصدير عدد سجلات MFT"
+
+msgid "Rename"
+msgstr "إعادة تسمية"
+
+msgid "Enable rename"
+msgstr "السماح بإعادة التسمية"
+
+msgid "Show Header"
+msgstr "عرض العنوان"

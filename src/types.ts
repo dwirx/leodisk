@@ -109,6 +109,8 @@ export interface CleanupReport {
   advisories?: CleanupItem[];
   summary?: CleanupReportSummary;
   categoryTotals?: CleanupCategoryTotal[];
+  scanEngine?: string;
+  cachePath?: string | null;
   totalBytes: number;
   totalFiles: number;
   skippedCount: number;
@@ -145,6 +147,30 @@ export interface StartupItem {
 export interface ScanJob {
   jobId: string;
   root: string;
+  engine: string;
+}
+
+export interface CleanupScanProgress {
+  jobId: string;
+  root: string;
+  currentPath: string;
+  phase?: string;
+  elapsedMs?: number;
+  rootsScanned: number;
+  foldersScanned: number;
+  filesScanned: number;
+  bytesScanned: number;
+  skippedCount: number;
+}
+
+export interface CleanupDeleteProgress {
+  jobId: string;
+  totalItems: number;
+  processedItems: number;
+  affectedCount: number;
+  reclaimedBytes: number;
+  skippedCount: number;
+  currentPath: string;
 }
 
 export interface DiskFolder {
@@ -193,6 +219,8 @@ export interface DiskScanProgress {
 export interface DiskScanResult {
   jobId: string;
   root: string;
+  engine: string;
+  cachePath?: string | null;
   rootLocationId: string;
   breadcrumbs: DiskBreadcrumb[];
   parentLocation?: DiskBreadcrumb;
@@ -203,6 +231,17 @@ export interface DiskScanResult {
   allFolders?: DiskFolder[];
   categories: DiskCategory[];
   largestFiles: LargeFile[];
+}
+
+export interface WizTreeStatus {
+  available: boolean;
+  verified: boolean;
+  executablePath?: string | null;
+  installDir: string;
+  version: string;
+  downloadUrl: string;
+  message: string;
+  lastError?: string | null;
 }
 
 export interface StorageVolume {

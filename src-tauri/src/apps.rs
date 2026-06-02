@@ -256,7 +256,8 @@ fn remnant_candidates(app_name: &str) -> Vec<PathBuf> {
     if wanted.len() < 4 {
         return Vec::new();
     }
-    ["APPDATA", "LOCALAPPDATA"]
+    let mut seen = std::collections::HashSet::new();
+    ["APPDATA", "LOCALAPPDATA", "PROGRAMDATA"]
         .into_iter()
         .filter_map(|variable| env::var(variable).ok())
         .flat_map(|root| {
@@ -274,7 +275,38 @@ fn remnant_candidates(app_name: &str) -> Vec<PathBuf> {
                 .map(|name| comparable_name(name) == wanted)
                 .unwrap_or(false)
         })
+        .flat_map(|path| {
+            let mut candidates = vec![path.clone()];
+            for child in [
+                "Cache",
+                "Code Cache",
+                "GPUCache",
+                "DawnCache",
+                "ShaderCache",
+                "logs",
+                "Log",
+                "Crashpad/reports",
+                "extensions",
+                "plugins",
+                "User Data",
+                "Local Storage",
+                "IndexedDB",
+                "Preferences",
+                "config",
+            ] {
+                let child_path = path.join(child);
+                if child_path.exists() {
+                    candidates.push(child_path);
+                }
+            }
+            candidates
+        })
+        .filter(|path| seen.insert(path_display_key(path)))
         .collect()
+}
+
+fn path_display_key(path: &PathBuf) -> String {
+    path.to_string_lossy().to_ascii_lowercase()
 }
 
 #[tauri::command]

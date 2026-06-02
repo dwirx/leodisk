@@ -1,0 +1,894 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: he\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.5\n"
+
+#: WizTreeMain.pas:673
+msgid "Scanning..."
+msgstr "סורק..."
+
+#: WizTreeMain.pas:673 WizTreeMain.pas:4286
+msgid "Folders"
+msgstr "תיקיות"
+
+#: WizTreeMain.pas:673 WizTreeMain.pas:4283
+msgid "Files"
+msgstr "קבצים"
+
+#: WizTreeMain.pas:688
+msgid "Dumping file"
+msgstr "מייצא קובץ"
+
+#: WizTreeMain.pas:688 WizTreeMain.pas:953
+msgid "MB"
+msgstr "MB"
+
+#: WizTreeMain.pas:950
+msgid "GB"
+msgstr "GB"
+
+#: WizTreeMain.pas:956
+msgid "KB"
+msgstr "KB"
+
+#: WizTreeMain.pas:961
+msgid "Bytes"
+msgstr "בייטים"
+
+#: WizTreeMain.pas:1141
+msgid "Files in"
+msgstr "קבצים ב"
+
+#: WizTreeMain.pas:1143
+msgid "File in"
+msgstr "קובץ ב"
+
+#: WizTreeMain.pas:1691 WizTreeMain.pas:1738
+msgid "Selected Files"
+msgstr "קבצים נבחרים"
+
+#: WizTreeMain.pas:1691 WizTreeMain.pas:1738 WizTreeMain.pas:3593
+msgid "Total Size"
+msgstr "גודל כולל"
+
+#: WizTreeMain.pas:1874 WizTreeMain.pas:1976 WizTreeMain.pas:2033
+msgid "You are about to open"
+msgstr "אתה עומד לפתוח"
+
+#: WizTreeMain.pas:1875
+msgid "Command Prompt windows - are you sure?"
+msgstr "חלונות שורת פקודה - האם אתה בטוח?"
+
+#: WizTreeMain.pas:1977
+msgid "Explorer windows - are you sure?"
+msgstr "חלונות סייר - האם אתה בטוח?"
+
+#: WizTreeMain.pas:2034
+msgid "files - are you sure?"
+msgstr "קבצים - האם אתה בטוח?"
+
+#. FileName := FDir;
+#. 2 = select directory
+#: WizTreeMain.pas:2147 WizTreeMain.pas:2162 WizTreeMain.pas:3041
+msgid "Select Folder"
+msgstr "בחר תיקייה"
+
+#. YMMV
+#: WizTreeMain.pas:2149
+msgid "Select"
+msgstr "בחר"
+
+#: WizTreeMain.pas:2202
+msgid "File not found"
+msgstr "קובץ לא נמצא"
+
+#: WizTreeMain.pas:2326
+msgid "Error"
+msgstr "שגיאה"
+
+#: WizTreeMain.pas:2351
+msgid "Sorting file list..."
+msgstr "ממיין רשימת קבצים..."
+
+#: WizTreeMain.pas:2362
+msgid "Loading tree..."
+msgstr "טוען עץ..."
+
+#: WizTreeMain.pas:2406
+msgid "Scan complete in"
+msgstr "סריקה הושלמה תוך"
+
+#: WizTreeMain.pas:2408
+msgid "seconds"
+msgstr "שניות"
+
+#: WizTreeMain.pas:2412
+msgid "canceled"
+msgstr "בוטל"
+
+#: WizTreeMain.pas:2480
+msgid "Failed to update Windows Explorer context menu"
+msgstr "עדכון תפריט ההקשר של סייר Windows נכשל"
+
+#: WizTreeMain.pas:2560
+msgid "No MFT root found!"
+msgstr "שורש MFT לא נמצא!"
+
+#. we have an update!
+#: WizTreeMain.pas:2640
+msgid "An update is available"
+msgstr "עדכון זמין"
+
+#: WizTreeMain.pas:2641
+msgid "Click on the \"View Update\" button to learn more."
+msgstr "לחץ על הכפתור \"הצג עדכון\" למידע נוסף."
+
+#. if tag set then display error if any
+#: WizTreeMain.pas:2648
+msgid "No update found."
+msgstr "לא נמצא עדכון."
+
+#. if tag set then display error if any
+#: WizTreeMain.pas:2660
+msgid "Error checking for updates:"
+msgstr "שגיאה בבדיקת עדכונים:"
+
+#: WizTreeMain.pas:2836
+msgid "Please restart WizTree as Administrator to dump the MFT file"
+msgstr "אנא הפעל מחדש את WizTree כמנהל מערכת כדי לייצא את קובץ ה-MFT"
+
+#: WizTreeMain.pas:2844
+msgid "Please select an NTFS formatted drive."
+msgstr "אנא בחר כונן מפורמט NTFS."
+
+#: WizTreeMain.pas:2869
+msgid "Dumping MFT file, please wait..."
+msgstr "מייצא קובץ MFT, אנא המתן..."
+
+#: WizTreeMain.pas:2880
+msgid "MFT data dump complete."
+msgstr "ייצוא נתוני MFT הושלם."
+
+#: WizTreeMain.pas:2884
+msgid "MFT data dumped to file"
+msgstr "נתוני MFT יוצאו לקובץ"
+
+#: WizTreeMain.pas:2991
+msgid "64 bit"
+msgstr "64 סיביות"
+
+#: WizTreeMain.pas:2993
+msgid "32 bit"
+msgstr "32 סיביות"
+
+#: WizTreeMain.pas:3042
+msgid "MFT file"
+msgstr "קובץ MFT"
+
+#: WizTreeMain.pas:3487
+msgid "Loading file list..."
+msgstr "טוען רשימת קבצים..."
+
+#: WizTreeMain.pas:3592
+msgid "files"
+msgstr "קבצים"
+
+#. lblTotalSpacePerc.Caption := '';
+#: WizTreeMain.pas:3636 WizTreeMain.pas:3637 WizTreeMain.pas:3658
+#: WizTreeMain.pas:3663 WizTreeMain.pas:3666 WizTreeMain.pas:3674
+#: WizTreeMain.pas:3675 WizTreeMain.pas:3677 WizTreeMain.pas:3679
+#: WizTreeMain.pas:3681 WizTreeMain.pas:4268 WizTreeMain.pas:4269
+#: WizTreeMain.pas:4270 WizTreeMain.pas:4271 WizTreeMain.pas:4272
+#: WizTreeMain.pas:4273 WizTreeMain.pas:4274
+msgid "n/a"
+msgstr "לא זמין"
+
+#: WizTreeMain.pas:3648
+msgid "<Folder>"
+msgstr "<תיקייה>"
+
+#: WizTreeMain.pas:4228
+msgid "File"
+msgstr "קובץ"
+
+#: WizTreeMain.pas:4229
+msgid "Options"
+msgstr "אפשרויות"
+
+#: WizTreeMain.pas:4230 WizTreeMain.pas:4260
+msgid "Scan"
+msgstr "סרוק"
+
+#: WizTreeMain.pas:4231
+msgid "New Instance"
+msgstr "מופע חדש"
+
+#: WizTreeMain.pas:4232
+msgid "Explore Folder"
+msgstr "עיין בתיקייה"
+
+#: WizTreeMain.pas:4233
+msgid "Command Prompt Here"
+msgstr "שורת פקודה כאן"
+
+#: WizTreeMain.pas:4234
+msgid "Copy Path"
+msgstr "העתק נתיב"
+
+#: WizTreeMain.pas:4235
+msgid "Delete (to Recycle Bin)"
+msgstr "מחק (לסל המחזור)"
+
+#: WizTreeMain.pas:4236
+msgid "Delete (No undelete possible)"
+msgstr "מחק (לא ניתן לשחזר)"
+
+#: WizTreeMain.pas:4237
+msgid "Dump MFT File"
+msgstr "ייצא קובץ MFT"
+
+#: WizTreeMain.pas:4238
+msgid "Exit"
+msgstr "יציאה"
+
+#: WizTreeMain.pas:4240
+msgid "Display Dynamic values"
+msgstr "הצג ערכים דינמיים"
+
+#: WizTreeMain.pas:4241
+msgid "Display Byte values"
+msgstr "הצג ערכי בייט"
+
+#: WizTreeMain.pas:4242
+msgid "Display KB values"
+msgstr "הצג ערכי KB"
+
+#: WizTreeMain.pas:4243
+msgid "Display MB values"
+msgstr "הצג ערכי MB"
+
+#: WizTreeMain.pas:4244
+msgid "Display GB values"
+msgstr "הצג ערכי GB"
+
+#: WizTreeMain.pas:4245
+msgid "Windows Explorer context menu"
+msgstr "תפריט הקשר של סייר Windows"
+
+#: WizTreeMain.pas:4246
+msgid "Always Run as Administrator"
+msgstr "הפעל תמיד כמנהל מערכת"
+
+#: WizTreeMain.pas:4248
+msgid "Language"
+msgstr "שפה"
+
+#: WizTreeMain.pas:4250
+msgid "Restart as Administrator"
+msgstr "הפעל מחדש כמנהל מערכת"
+
+#: WizTreeMain.pas:4251
+msgid "WizTree requires \"Administrator\" rights to enable high speed scanning of NTFS hard drives and to access all system files and folders. Click on the \"Restart as Administrator\" button to enable Administrator rights."
+msgstr "WizTree דורש הרשאות \"מנהל מערכת\" כדי לאפשר סריקה במהירות גבוהה של כוננים קשיחים בפורמט NTFS ולגשת לכל קבצי המערכת והתיקיות. לחץ על הכפתור \"הפעל מחדש כמנהל מערכת\" כדי לאפשר הרשאות מנהל מערכת."
+
+#: WizTreeMain.pas:4252
+msgid "Don't show this again"
+msgstr "אל תציג שוב"
+
+#: WizTreeMain.pas:4254
+msgid "View Update"
+msgstr "הצג עדכון"
+
+#: WizTreeMain.pas:4255
+msgid "Dismiss"
+msgstr "סגור"
+
+#: WizTreeMain.pas:4256
+msgid "Check for updates"
+msgstr "בדוק עדכונים"
+
+#: WizTreeMain.pas:4257
+msgid "Check for updates now"
+msgstr "בדוק עדכונים עכשיו"
+
+#: WizTreeMain.pas:4259
+msgid "Select:"
+msgstr "בחר:"
+
+#: WizTreeMain.pas:4261
+msgid "Cancel"
+msgstr "ביטול"
+
+#: WizTreeMain.pas:4262
+msgid "Ready..."
+msgstr "מוכן..."
+
+#: WizTreeMain.pas:4263
+msgid "Selection:"
+msgstr "בחירה:"
+
+#: WizTreeMain.pas:4264
+msgid "Total Space:"
+msgstr "נפח כולל:"
+
+#: WizTreeMain.pas:4265
+msgid "Space Used:"
+msgstr "נפח בשימוש:"
+
+#: WizTreeMain.pas:4266
+msgid "Space Free:"
+msgstr "נפח פנוי:"
+
+#: WizTreeMain.pas:4276
+msgid "Help us make WizTree better!"
+msgstr "עזור לנו לשפר את WizTree!"
+
+#: WizTreeMain.pas:4278
+msgid "Tree View"
+msgstr "תצוגת עץ"
+
+#: WizTreeMain.pas:4280
+msgid "Folder"
+msgstr "תיקייה"
+
+#: WizTreeMain.pas:4281
+msgid "Percent of Parent"
+msgstr "אחוז מתיקיית האב"
+
+#: WizTreeMain.pas:4282 WizTreeMain.pas:4307
+msgid "Size"
+msgstr "גודל"
+
+#: WizTreeMain.pas:4284 WizTreeMain.pas:4308
+msgid "Modified"
+msgstr "תאריך שינוי"
+
+#: WizTreeMain.pas:4285 WizTreeMain.pas:4309
+msgid "Attributes"
+msgstr "תכונות"
+
+#: WizTreeMain.pas:4287
+msgid "Items"
+msgstr "פריטים"
+
+#: WizTreeMain.pas:4288 WizTreeMain.pas:4310
+msgid "Allocated"
+msgstr "גודל בדיסק"
+
+#: WizTreeMain.pas:4290
+msgid "File View"
+msgstr "תצוגת קבצים"
+
+#: WizTreeMain.pas:4292
+msgid "File Search Filter:"
+msgstr "מסנן חיפוש קבצים:"
+
+#: WizTreeMain.pas:4293
+msgid "Clear"
+msgstr "נקה"
+
+#: WizTreeMain.pas:4294
+msgid "Match file name only"
+msgstr "התאם שם קובץ בלבד"
+
+#: WizTreeMain.pas:4295
+msgid "(Fast)"
+msgstr "(מהיר)"
+
+#: WizTreeMain.pas:4296
+msgid "Match entire path"
+msgstr "התאם נתיב מלא"
+
+#: WizTreeMain.pas:4297
+msgid "(Warning: can be slow!)"
+msgstr "(אזהרה: עלול להיות איטי!)"
+
+#: WizTreeMain.pas:4298
+msgid "Max files to display:"
+msgstr "מקסימום קבצים להצגה:"
+
+#: WizTreeMain.pas:4300
+msgid "(Selecting ALL can be very slow!)"
+msgstr "(בחירת הכל עלולה להיות איטית מאוד!)"
+
+#: WizTreeMain.pas:4301
+msgid "ALL"
+msgstr "הכל"
+
+#: WizTreeMain.pas:4303
+msgid "Total Files:"
+msgstr "סה\"כ קבצים:"
+
+#: WizTreeMain.pas:4305
+msgid "File Name"
+msgstr "שם קובץ"
+
+#: WizTreeMain.pas:4306
+msgid "Percent of Drive"
+msgstr "אחוז מהכונן"
+
+#: WizTreeMain.pas:4312
+msgid "About"
+msgstr "אודות"
+
+#: WizTreeMain.pas:4314
+msgid "If you use WizTree commercially or you'd just like to support the freeware community then please make a donation by clicking on the Donate button at the top right of the screen. Thank you! :)"
+msgstr "אם אתה משתמש ב-WizTree לצרכים מסחריים או שברצונך לתמוך בקהילת התוכנות החינמיות, אנא תרום על ידי לחיצה על כפתור התרומה בפינה הימנית העליונה של המסך. תודה! :)"
+
+#: WizTreeMain.pas:4316
+msgid "What is WizTree?"
+msgstr "מה זה WizTree?"
+
+#: WizTreeMain.pas:4317
+msgid "WizTree is the world's fastest disk space analyzer. It scans your hard drive and shows you which files and folders are using the most disk space."
+msgstr "WizTree הוא מנתח מרחב הדיסק המהיר בעולם. הוא סורק את הכונן הקשיח שלך ומציג אילו קבצים ותיקיות צורכים את מרבית שטח הדיסק."
+
+#: WizTreeMain.pas:4318
+msgid "It does this in the FASTEST way possible - you simply won't find any other application of this type that's quicker! Use the information WizTree provides to quickly locate and remove \"space hogs\" from your hard drive."
+msgstr "הוא עושה זאת בדרך המהירה ביותר האפשרית - פשוט לא תמצא יישום אחר מסוג זה שמהיר יותר! השתמש במידע שמספק WizTree כדי לאתר ולהסיר במהירות \"בולעי שטח\" מהכונן הקשיח שלך."
+
+#: WizTreeMain.pas:4320
+msgid "WARNING: Take care not to remove any files that are required for the correct operation of your PC!"
+msgstr "אזהרה: היזהר שלא להסיר קבצים הנדרשים לפעולה התקינה של המחשב שלך!"
+
+#: WizTreeMain.pas:4322
+msgid "What makes WizTree so fast?"
+msgstr "מה הופך את WizTree למהיר כל כך?"
+
+#: WizTreeMain.pas:4324
+msgid "When scanning NTFS formatted hard drives (most modern hard drives use this format), WizTree reads the hard drive's Master File Table (MFT) directly from the disk."
+msgstr "בעת סריקת כוננים קשיחים בפורמט NTFS (רוב הכוננים הקשיחים המודרניים משתמשים בפורמט זה), WizTree קורא את טבלת הקבצים הראשית (MFT) של הכונן הקשיח ישירות מהדיסק."
+
+#: WizTreeMain.pas:4325
+msgid "The MFT is a special hidden file used by the NTFS file system to keep track of all files and folders on a hard drive. Scanning for files this way completely bypasses the operating system (Windows) and provides a huge performance boost."
+msgstr "ה-MFT הוא קובץ מוסתר מיוחד המשמש את מערכת הקבצים NTFS למעקב אחר כל הקבצים והתיקיות בכונן קשיח. סריקת קבצים בדרך זו עוקפת לחלוטין את מערכת ההפעלה (Windows) ומספקת שיפור ביצועים עצום."
+
+#: WizTreeMain.pas:4327
+msgid "As of version 2.0, WizTree can now also scan non NTFS hard drives, network drives, USB drives, and individual directories."
+msgstr "החל מגרסה 2.0, WizTree יכול כעת לסרוק גם כוננים קשיחים שאינם NTFS, כוננות רשת, כוננות USB ותיקיות בודדות."
+
+#: WizTreeMain.pas:4329
+msgid "Please visit the Antibody Software website for more great software, such as:"
+msgstr "בקר באתר של Antibody Software לתוכנות נוספות, כגון:"
+
+#: WizTreeMain.pas:4330 WizTreeMain.pas:4334
+msgid "(click for more information)"
+msgstr "(לחץ למידע נוסף)"
+
+#: WizTreeMain.pas:4331
+msgid "A powerful yet easy to use web gallery downloading tool. It supports most of the popular image hosting sites (such as flickr, facebook, Google image search, imgur, deviantart etc.)."
+msgstr "כלי הורדת גלריות אינטרנט חזק וקל לשימוש. הוא תומך ברוב אתרי אחסון התמונות הפופולריים (כגון flickr, facebook, חיפוש תמונות Google, imgur, deviantart וכו')."
+
+#: WizTreeMain.pas:4332
+msgid "It doesn't require any complicated setup or project files - it just works."
+msgstr "הוא אינו דורש הגדרות מורכבות או קבצי פרויקט - הוא פשוט עובד."
+
+#: SelectLanguage.pas:56 supportercode.pas:239
+msgid "OK"
+msgstr "אישור"
+
+#: supportercode.pas:143
+msgid "Invalid Key - Please try again."
+msgstr "מפתח לא תקין - אנא נסה שוב."
+
+#: supportercode.pas:144
+msgid "It is recommended that you copy and paste your supporter code."
+msgstr "מומלץ להעתיק ולהדביק את קוד התמיכה שלך."
+
+#: supportercode.pas:145
+msgid "Only use digits 0 to 9 and letters A to F."
+msgstr "השתמש רק בספרות 0 עד 9 ובאותיות A עד F."
+
+#: supportercode.pas:219 WizTreeMain.pas:6266
+msgid "Thank you for your support!"
+msgstr "תודה על תמיכתך!"
+
+#: supportercode.pas:220
+msgid "WizTree will now restart."
+msgstr "WizTree יופעל מחדש."
+
+#: supportercode.pas:241 WizTreeMain.pas:5286
+msgid "Enter Supporter Code"
+msgstr "הזן קוד תמיכה"
+
+#: supportercode.pas:242
+msgid "Supporter Code"
+msgstr "קוד תמיכה"
+
+#. warning dialog title
+#: uVistaTaskDialog.pas:228
+msgid "Warning"
+msgstr "אזהרה"
+
+#. confirmation dialog title
+#: uVistaTaskDialog.pas:233
+msgid "Confirmation"
+msgstr "אישור"
+
+#. information dialog title
+#: uVistaTaskDialog.pas:243
+msgid "Information"
+msgstr "מידע"
+
+#: WizTreeMain.pas:1616
+msgid "(No Extension)"
+msgstr "(ללא סיומת)"
+
+#: WizTreeMain.pas:5269
+msgid "File Type"
+msgstr "סוג קובץ"
+
+#: WizTreeMain.pas:5272
+msgid "Percent"
+msgstr "אחוז"
+
+#: WizTreeMain.pas:5273
+msgid "Extension"
+msgstr "סיומת"
+
+#: WizTreeMain.pas:5276
+msgid "MFT Dump"
+msgstr "ייצוא MFT"
+
+#: WizTreeMain.pas:5276
+msgid "All Files"
+msgstr "כל הקבצים"
+
+#: WizTreeMain.pas:5277
+msgid "Show Treemap"
+msgstr "הצג מפת עץ"
+
+#: WizTreeMain.pas:5278
+msgid "Show File Types"
+msgstr "הצג סוגי קבצים"
+
+#: WizTreeMain.pas:5279
+msgid "Reset tree expansion"
+msgstr "אפס הרחבת עץ"
+
+#: WizTreeMain.pas:5281
+msgid "Select Parent"
+msgstr "בחר תיקיית אב"
+
+#: WizTreeMain.pas:5282
+msgid "Reselect Child"
+msgstr "בחר מחדש פריט בן"
+
+#: WizTreeMain.pas:5283
+msgid "Help support WizTree development by making a donation"
+msgstr "תמוך בפיתוח WizTree על ידי תרומה"
+
+#: WizTreeMain.pas:5284
+msgid "(You can hide the Donate button by making a donation)"
+msgstr "(תוכל להסתיר את כפתור התרומה על ידי ביצוע תרומה)"
+
+#: WizTreeMain.pas:6883
+msgid "Show Allocated Size on Treemap"
+msgstr "הצג גודל מוקצה במפת העץ"
+
+#: WizTreeMain.pas:6884
+msgid "Auto scan after making selection"
+msgstr "סרוק אוטומטית לאחר בחירה"
+
+#: WizTreeMain.pas:6886
+msgid "Zoom in Treemap"
+msgstr "הגדל מפת עץ"
+
+#: WizTreeMain.pas:6887
+msgid "Zoom out Treemap"
+msgstr "הקטן מפת עץ"
+
+#: exporttreemap.pas:57 WizTreeMain.pas:7193
+msgid "Save Treemap Image as .png file"
+msgstr "שמור תמונת מפת עץ כקובץ .png"
+
+#: exporttreemap.pas:58
+msgid "Save"
+msgstr "שמור"
+
+#: exporttreemap.pas:60
+msgid "Width"
+msgstr "רוחב"
+
+#: exporttreemap.pas:61
+msgid "Height"
+msgstr "גובה"
+
+#: exporttreemap.pas:62
+msgid "Shades of Gray (single color)"
+msgstr "גוני אפור (צבע יחיד)"
+
+#: WizTreeMain.pas:7191
+msgid "Show Free Space on Treemap"
+msgstr "הצג שטח פנוי במפת העץ"
+
+msgid "File already exists - overwrite?"
+msgstr "הקובץ כבר קיים - לדרוס?"
+
+#: WizTreeMain.pas:3002 WizTreeMain.pas:3217
+msgid "Generated by"
+msgstr "נוצר על ידי"
+
+#: WizTreeMain.pas:3002 WizTreeMain.pas:3217
+msgid "You can hide this message by making a donation"
+msgstr "תוכל להסתיר הודעה זו על ידי ביצוע תרומה"
+
+#: WizTreeMain.pas:4452
+msgid "MFT Dump cancelled..."
+msgstr "ייצוא MFT בוטל..."
+
+#: WizTreeMain.pas
+msgid "Export complete."
+msgstr "הייצוא הושלם."
+
+#: WizTreeMain.pas:7815
+msgid "Copy file and size info to clipboard"
+msgstr "העתק מידע על קובץ וגודל ללוח"
+
+#: WizTreeMain.pas:7816
+msgid "Export to .CSV file"
+msgstr "ייצא לקובץ .CSV"
+
+msgid "Colors"
+msgstr "צבעים"
+
+msgid "Default"
+msgstr "ברירת מחדל"
+
+msgid "Color Blind"
+msgstr "עיוור צבעים"
+
+msgid "CSV file"
+msgstr "קובץ CSV"
+
+msgid "Select CSV file"
+msgstr "בחר קובץ CSV"
+
+msgid "Failed to import CSV file"
+msgstr "ייבוא קובץ CSV נכשל"
+
+msgid "Color By"
+msgstr "צבע לפי"
+
+msgid "Color"
+msgstr "צבע"
+
+msgid "File Extension(s)"
+msgstr "סיומת קובץ"
+
+msgid "Export File Types to CSV file"
+msgstr "ייצא סוגי קבצים לקובץ CSV"
+
+msgid "Display TB values"
+msgstr "הצג ערכי TB"
+
+msgid "TB"
+msgstr "TB"
+
+msgid "UI Theme"
+msgstr "ערכת נושא"
+
+msgid "Auto"
+msgstr "אוטומטי"
+
+msgid "Light"
+msgstr "בהיר"
+
+msgid "Dark"
+msgstr "כהה"
+
+msgid "Sorry, your supporter code is only valid for versions of WizTree with version date"
+msgstr "מצטערים, קוד התמיכה שלך תקף רק לגרסאות WizTree עם תאריך גרסה"
+
+msgid "or earlier."
+msgstr "או מוקדם יותר."
+
+msgid "This version of WizTree has version date"
+msgstr "לגרסה זו של WizTree יש תאריך גרסה"
+
+msgid "Please install an older version of WizTree with a suitable version date, or purchase a new supporter code."
+msgstr "אנא התקן גרסה ישנה יותר של WizTree עם תאריך גרסה מתאים, או רכוש קוד תמיכה חדש."
+
+msgid "Version Date:"
+msgstr "תאריך גרסה:"
+
+msgid "Supporter license"
+msgstr "רישיון תמיכה"
+
+msgid "Enterprise license"
+msgstr "רישיון ארגוני"
+
+#: Displayed as X user license where is number
+msgid "user license"
+msgstr "רישיון משתמש"
+
+msgid "Upgrades until:"
+msgstr "שדרוגים עד:"
+
+msgid "lifetime"
+msgstr "לכל החיים"
+
+msgid "Supporter code not valid for this version"
+msgstr "קוד התמיכה אינו תקף לגרסה זו"
+
+msgid "Select Multiple"
+msgstr "בחר מרובה"
+
+msgid "Multiple"
+msgstr "מרובה"
+
+msgid "Add Folder"
+msgstr "הוסף תיקייה"
+
+msgid "Remove Folder"
+msgstr "הסר תיקייה"
+
+msgid "is included within"
+msgstr "כלול בתוך"
+
+msgid "They cannot both be selected."
+msgstr "לא ניתן לבחור את שניהם."
+
+msgid "Select All"
+msgstr "בחר הכל"
+
+msgid "Select None"
+msgstr "בטל בחירה"
+
+msgid "Lifetime"
+msgstr "לכל החיים"
+
+msgid "Show Folder and File Names on Treemap"
+msgstr "הצג שמות תיקיות וקבצים במפת העץ"
+
+msgid "Filter Scan Results"
+msgstr "סנן תוצאות סריקה"
+
+msgid "Include Filter:"
+msgstr "מסנן כלול:"
+
+msgid "Exclude Filter:"
+msgstr "מסנן לא כלול:"
+
+msgid "Apply Filter"
+msgstr "החל מסנן"
+
+msgid "Cut"
+msgstr "גזור"
+
+msgid "Copy"
+msgstr "העתק"
+
+msgid "Reset Configuration to default values"
+msgstr "אפס תצורה לערכי ברירת מחדל"
+
+msgid "Tweaks"
+msgstr "כוונונים"
+
+msgid "Enable drag/drop"
+msgstr "אפשר גרור ושחרר"
+
+msgid "Open file on double click"
+msgstr "פתח קובץ בלחיצה כפולה"
+
+msgid "Monitor file system for changes"
+msgstr "נטר שינויים במערכת הקבצים"
+
+msgid "Show max modified date of all sub folders/files as folder's last modified date"
+msgstr "הצג את תאריך השינוי המקסימלי של כל תיקיות/קבצים המשניים כתאריך השינוי האחרון של התיקייה"
+
+msgid "Use WizTree classic theme"
+msgstr "השתמש בערכת הנושא הקלאסית של WizTree"
+
+msgid "Show horizontal lines in grids"
+msgstr "הצג קווים אופקיים ברשתות"
+
+msgid "Alternate row colors"
+msgstr "צבעי שורות לסירוגין"
+
+msgid "Enable gradient colors in treemap"
+msgstr "אפשר צבעי שיפוע במפת העץ"
+
+msgid "Number of Decimal places to display"
+msgstr "מספר מקומות עשרוניים להצגה"
+
+msgid "WizFile is an extremely rapid file finder application that uses methods similar to WizTree to rapidly index your hard drives. File search results are returned instantly as you type. WizFile provides a real time view of all files on your hard drives - any changes to the file search results will be updated in real time as they occur. It requires minimal CPU and RAM usage and has a negligible impact on the performance of your PC."
+msgstr "WizFile הוא יישום חיפוש קבצים מהיר במיוחד המשתמש בשיטות דומות ל-WizTree לאינדוקס מהיר של הכוננים הקשיחים שלך. תוצאות חיפוש הקבצים מוחזרות באופן מיידי תוך כדי הקלדה. WizFile מספק תצוגה בזמן אמת של כל הקבצים בכוננים הקשיחים שלך - כל שינוי בתוצאות יתעדכן בזמן אמת כשהוא מתרחש. הוא דורש שימוש מינימלי ב-CPU וב-RAM ובעל השפעה זניחה על ביצועי המחשב שלך."
+
+msgid "Dup Count"
+msgstr "ספירת כפילויות"
+
+msgid "Dup Size"
+msgstr "גודל כפילויות"
+
+msgid "Duplicate Files:"
+msgstr "קבצים כפולים:"
+
+msgid "Duplicates only"
+msgstr "כפילויות בלבד"
+
+msgid "Don't locate duplicates"
+msgstr "אל תאתר כפילויות"
+
+msgid "Locate by Name, Size"
+msgstr "אתר לפי שם, גודל"
+
+msgid "Locate by Name, Size, Date"
+msgstr "אתר לפי שם, גודל, תאריך"
+
+msgid "Path"
+msgstr "נתיב"
+
+msgid "Scan MFT (if possible) when a folder is selected for analysis"
+msgstr "סרוק MFT (אם אפשרי) כשתיקייה נבחרת לניתוח"
+
+msgid "Normally the MFT is only scanned when an entire drive is selected. This option can speed up the scanning of folders containing a large number of files, but can be slower for smaller folders."
+msgstr "בדרך כלל ה-MFT נסרק רק כשנבחר כונן שלם. אפשרות זו יכולה לזרז את סריקת התיקיות המכילות מספר גדול של קבצים, אך עלולה להיות איטית יותר עבור תיקיות קטנות יותר."
+
+msgid "Reserved Space:"
+msgstr "שטח שמור:"
+
+msgid "Expand All"
+msgstr "הרחב הכל"
+
+msgid "File group minimum size (set to 0 to disable file grouping)"
+msgstr "גודל מינימלי של קבוצת קבצים (הגדר ל-0 כדי להשבית קיבוץ קבצים)"
+
+msgid "Export"
+msgstr "ייצא"
+
+msgid "Export file name:"
+msgstr "שם קובץ ייצוא:"
+
+msgid "Selection"
+msgstr "בחירה"
+
+msgid "Selected only"
+msgstr "נבחרים בלבד"
+
+msgid "Export drive size information"
+msgstr "ייצא מידע על גודל הכונן"
+
+msgid "Export \"Last Accessed\" and \"Created\" dates"
+msgstr "ייצא תאריכי \"גישה אחרונה\" ו\"יצירה\""
+
+msgid "Export total size and allocated size of folders (excluding sub folders)"
+msgstr "ייצא גודל כולל וגודל מוקצה של תיקיות (לא כולל תיקיות משניות)"
+
+msgid "Split file names into root, folder, filename and extension"
+msgstr "פצל שמות קבצים לשורש, תיקייה, שם קובץ וסיומת"
+
+msgid "Export percentage of parent value"
+msgstr "ייצא אחוז מערך האב"
+
+msgid "Max folder depth (0 = no limit):"
+msgstr "עומק תיקייה מקסימלי (0 = ללא הגבלה):"
+
+msgid "Export Files"
+msgstr "ייצא קבצים"
+
+msgid "Export Folders"
+msgstr "ייצא תיקיות"
+
+msgid "Either one or both of \"Export Files\" and \"Export Folders\" must be selected for the export to be valid."
+msgstr "יש לבחור לפחות אחד מ\"ייצא קבצים\" ו\"ייצא תיקיות\" כדי שהייצוא יהיה תקף."
+
+msgid "Export MFT record number"
+msgstr "ייצא מספר רשומת MFT"
+
+msgid "Rename"
+msgstr "שנה שם"
+
+msgid "Enable rename"
+msgstr "אפשר שינוי שם"
+
+msgid "Show Header"
+msgstr "הצג כותרת"

@@ -267,7 +267,7 @@ button.dragging {
 .metric {
   margin: 4px 0 20px;
   font: 600 clamp(28px, 2.1vw, 40px) var(--mono);
-  letter-spacing: -0.06em;
+  letter-spacing: 0;
 }
 
 .metric small {
@@ -290,6 +290,50 @@ button.dragging {
   grid-template-columns: 1.45fr 0.95fr 0.95fr 0.95fr;
   gap: 18px;
   margin-bottom: 18px;
+}
+
+.status-insights {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(280px, 1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.insight-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(236, 222, 190, 0.08);
+}
+
+.insight-row span,
+.insight-row small {
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+
+.insight-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.health-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.health-flags span {
+  padding: 8px 10px;
+  color: var(--text);
+  background: rgba(236, 222, 190, 0.07);
+  border: 1px solid rgba(236, 222, 190, 0.1);
+  border-radius: 8px;
+  font: 12px var(--mono);
 }
 
 .status-grid .panel {
@@ -326,6 +370,35 @@ button.dragging {
   grid-column: span 1;
 }
 
+.feature-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.scope-card {
+  min-height: 76px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 9px;
+  border: 1px solid rgba(236, 222, 190, 0.08);
+  border-radius: 8px;
+  background: rgba(236, 222, 190, 0.035);
+}
+
+.scope-card strong {
+  font: 600 13px var(--mono);
+}
+
+.scope-card small {
+  color: var(--muted);
+  font: 12px var(--mono);
+  line-height: 1.45;
+}
+
 .battery-card {
   grid-column: span 1;
 }
@@ -343,6 +416,25 @@ button.dragging {
   display: block;
   height: 100%;
   border-radius: inherit;
+  transition: width 0.35s ease;
+}
+
+.progress.indeterminate span {
+  width: 38%;
+  min-width: 120px;
+  animation: scan-progress 1.25s ease-in-out infinite;
+}
+
+@keyframes scan-progress {
+  0% {
+    transform: translateX(-115%);
+  }
+  55% {
+    transform: translateX(92%);
+  }
+  100% {
+    transform: translateX(280%);
+  }
 }
 
 .progress .mint {
@@ -355,6 +447,86 @@ button.dragging {
 
 .progress .amber {
   background: var(--amber);
+}
+
+.scan-progress-panel {
+  border-color: rgba(87, 155, 230, 0.26);
+  background:
+    linear-gradient(135deg, rgba(87, 155, 230, 0.09), rgba(236, 222, 190, 0.025)),
+    var(--surface);
+}
+
+.scan-progress-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.scan-progress-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--blue);
+}
+
+.scan-progress-head strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.scan-progress-phase {
+  display: inline-flex;
+  max-width: 100%;
+  margin-bottom: 7px;
+  padding: 4px 8px;
+  color: #9cc8ff;
+  border: 1px solid rgba(87, 155, 230, 0.18);
+  border-radius: 999px;
+  background: rgba(87, 155, 230, 0.09);
+  font: 700 11px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-progress-head p,
+.scan-progress-panel p {
+  margin: 0;
+  color: var(--muted);
+  font: 13px var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.scan-progress-panel .progress {
+  margin: 18px 0 12px;
+}
+
+.scan-progress-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.scan-progress-stats span {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(236, 222, 190, 0.08);
+  border-radius: 8px;
+  background: rgba(236, 222, 190, 0.04);
+  color: var(--muted);
+  font: 12px var(--mono);
+}
+
+.scan-progress-stats strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  font: 650 16px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sparkline {
@@ -796,6 +968,91 @@ button.dragging {
   gap: 8px;
 }
 
+.engine-switch {
+  padding: 4px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  border: 1px solid rgba(236, 222, 190, 0.12);
+  border-radius: 10px;
+  background: rgba(236, 222, 190, 0.04);
+}
+
+.engine-switch button {
+  min-width: 74px;
+  padding: 8px 10px;
+  color: var(--muted);
+  border-radius: 7px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.engine-switch button.active {
+  color: var(--text);
+  background: rgba(87, 155, 230, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(87, 155, 230, 0.34);
+}
+
+.cleanup-engine-switch {
+  align-self: stretch;
+  flex-wrap: wrap;
+}
+
+.wiztree-status-panel {
+  border-color: rgba(232, 175, 98, 0.22);
+}
+
+.wiztree-status-panel.ready {
+  border-color: rgba(75, 196, 156, 0.22);
+}
+
+.wiztree-status-layout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.wiztree-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--amber);
+  box-shadow: 0 0 0 6px rgba(232, 175, 98, 0.1);
+}
+
+.wiztree-status-panel.ready .wiztree-status-dot {
+  background: var(--mint);
+  box-shadow: 0 0 0 6px rgba(75, 196, 156, 0.1);
+}
+
+.wiztree-status-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.wiztree-status-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.wiztree-status-copy code {
+  min-width: 0;
+  color: #9cc8ff;
+  font: 12px var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.wiztree-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .startup-row {
   min-height: 66px;
   padding: 10px 0;
@@ -851,6 +1108,9 @@ button.dragging {
   border-radius: 8px;
   background: rgba(236, 222, 190, 0.035);
   font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scan-metrics strong,
@@ -1263,12 +1523,17 @@ button.dragging {
 }
 
 .admin-clean-dialog {
+  width: min(620px, calc(100vw - 32px));
   max-width: 620px;
+}
+
+.dialog-title-row h2 {
+  margin-bottom: 10px;
 }
 
 .confirm-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 10px;
   margin: 16px 0;
 }
@@ -1303,13 +1568,26 @@ button.dragging {
 }
 
 .phrase-confirm input {
+  width: 100%;
   min-height: 42px;
   padding: 0 12px;
   color: var(--text);
   border: 1px solid rgba(220, 119, 99, 0.42);
   border-radius: 8px;
   background: rgba(12, 11, 10, 0.86);
+  box-sizing: border-box;
   font: 700 13px var(--mono);
+}
+
+.admin-clean-dialog .dialog-actions {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.7fr) repeat(2, minmax(140px, 1fr));
+  align-items: stretch;
+}
+
+.admin-clean-dialog .dialog-actions .button {
+  justify-content: center;
+  min-width: 0;
 }
 
 .load-more {
@@ -1346,6 +1624,107 @@ button.dragging {
   color: var(--text);
   border-color: rgba(88, 161, 217, 0.45);
   background: rgba(88, 161, 217, 0.13);
+}
+
+.folder-graph {
+  display: grid;
+  gap: 9px;
+}
+
+.folder-graph-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.folder-graph-track {
+  --bar: 0%;
+  position: relative;
+  min-width: 0;
+  min-height: 58px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) minmax(86px, auto);
+  gap: 12px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(236, 222, 190, 0.1);
+  border-radius: 8px;
+  background: rgba(236, 222, 190, 0.035);
+  text-align: left;
+}
+
+.folder-graph-track::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--bar);
+  background: linear-gradient(90deg, rgba(232, 175, 98, 0.28), rgba(87, 155, 230, 0.16));
+  pointer-events: none;
+}
+
+.folder-graph-track > * {
+  position: relative;
+  z-index: 1;
+}
+
+.folder-graph-rank {
+  color: var(--amber);
+  font: 700 13px var(--mono);
+}
+
+.folder-graph-name {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.folder-graph-name strong,
+.folder-graph-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-graph-name small,
+.folder-graph-size small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.folder-graph-size {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.folder-graph-size strong {
+  font: 700 13px var(--mono);
+}
+
+.folder-graph-open {
+  min-width: 48px;
+}
+
+.cleanup-item-graph .folder-graph-track {
+  min-height: 62px;
+}
+
+.cleanup-graph-row.clean .folder-graph-track::before {
+  background: linear-gradient(90deg, rgba(75, 196, 156, 0.28), rgba(75, 196, 156, 0.08));
+}
+
+.cleanup-graph-row.review .folder-graph-track::before {
+  background: linear-gradient(90deg, rgba(87, 155, 230, 0.28), rgba(87, 155, 230, 0.08));
+}
+
+.cleanup-graph-row.admin .folder-graph-track::before,
+.cleanup-graph-row.manual .folder-graph-track::before,
+.cleanup-graph-row.advisory .folder-graph-track::before {
+  background: linear-gradient(90deg, rgba(232, 175, 98, 0.3), rgba(220, 119, 99, 0.12));
 }
 
 .scan-current,
@@ -1774,16 +2153,21 @@ button.dragging {
   z-index: 20;
   display: grid;
   place-items: center;
+  padding: 16px;
   background: rgba(8, 7, 6, 0.66);
+  overflow-y: auto;
 }
 
 .dialog {
   width: min(460px, calc(100vw - 48px));
+  max-height: calc(100vh - 32px);
   padding: 28px;
   background: var(--surface-raised);
   border: 1px solid var(--line-strong);
   border-radius: 17px;
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.4);
+  overflow: auto;
+  box-sizing: border-box;
 }
 
 .dialog h2 {
@@ -1800,6 +2184,7 @@ button.dragging {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .toast {
@@ -1850,6 +2235,10 @@ button.dragging {
 
   .status-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .status-insights {
+    grid-template-columns: 1fr;
   }
 
   .health-card {
@@ -1938,6 +2327,7 @@ button.dragging {
   }
 
   .row-buttons,
+  .engine-switch,
   .storage-settings {
     justify-content: flex-start;
     flex-wrap: wrap;
@@ -1948,9 +2338,27 @@ button.dragging {
     flex: 1 1 190px;
   }
 
+  .folder-graph-row {
+    grid-template-columns: 1fr;
+  }
+
+  .wiztree-status-layout {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .wiztree-status-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .folder-graph-open {
+    justify-self: flex-start;
+  }
+
   .summary-cards,
   .analysis-summary,
-  .status-grid {
+  .status-grid,
+  .status-insights {
     grid-template-columns: 1fr;
   }
 
@@ -2071,6 +2479,18 @@ button.dragging {
     width: 100%;
   }
 
+  .wiztree-status-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .wiztree-status-dot {
+    display: none;
+  }
+
+  .wiztree-status-actions .button {
+    width: 100%;
+  }
+
   .panel-actions {
     align-items: stretch;
     flex-direction: column;
@@ -2092,6 +2512,15 @@ button.dragging {
 
   .dialog-actions {
     flex-direction: column;
+  }
+
+  .admin-clean-dialog {
+    width: min(100%, calc(100vw - 20px));
+    padding: 20px;
+  }
+
+  .admin-clean-dialog .dialog-actions {
+    grid-template-columns: 1fr;
   }
 
   .confirm-summary-grid {

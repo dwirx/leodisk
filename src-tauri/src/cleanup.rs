@@ -4,16 +4,21 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use rayon::prelude::*;
+use tauri::Emitter;
 use walkdir::WalkDir;
 
 use crate::{
     models::{
-        ActionReport, ApiError, ApiResult, CleanupCategoryTotal, CleanupItem, CleanupReport,
-        CleanupReportSummary,
+        ActionReport, ApiError, ApiResult, CleanupCategoryTotal, CleanupDeleteProgress,
+        CleanupItem, CleanupReport, CleanupReportSummary, CleanupScanProgress, ScanJob,
     },
     state::{AppState, DeleteMode, TrackedDeletion},
     util::{normalized_path, opaque_id, path_display},
@@ -21,6 +26,42 @@ use crate::{
 
 const ADMIN_CONFIRMATION_PHRASE: &str = "SAYA MENGERTI";
 const CLEANUP_FOLDER_EXPANSION_DEPTH: usize = 3;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CleanupScanEngine {
+    Native,
+    Dust,
+    WizTree,
+}
+
+impl CleanupScanEngine {
+    fn from_request(value: Option<String>) -> ApiResult<Self> {
+        match value
+            .as_deref()
+            .unwrap_or("native")
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "" | "native" => Ok(Self::Native),
+            "dust" | "dust-native" | "dustnative" => Ok(Self::Dust),
+            "wiztree" | "wiz-tree" => Ok(Self::WizTree),
+            _ => Err(ApiError::new(
+                "CLEANUP_ENGINE_UNSUPPORTED",
+                "Metode scan cleanup tidak dikenali.",
+            )),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Native => "Native",
+            Self::Dust => "Dust Native",
+            Self::WizTree => "WizTree CLI",
+        }
+    }
+}
+
 #[derive(Clone)]
 struct ScanRoot {
     name: String,
@@ -1113,25 +1154,210 @@ fn advisory_roots() -> Vec<ScanRoot> {
     roots
 }
 
-pub fn measure_path(path: &Path) -> (u64, u64, u64) {
+fn measure_path_with_context(path: &Path, context: Option<&CleanupScanContext>) -> (u64, u64, u64) {
     let mut size = 0;
     let mut files = 0;
     let mut skipped = 0;
     for entry in WalkDir::new(path).follow_links(false) {
+        if context
+            .map(CleanupScanContext::is_cancelled)
+            .unwrap_or(false)
+        {
+            break;
+        }
         match entry {
-            Ok(entry) if entry.file_type().is_symlink() => skipped += 1,
+            Ok(entry) if entry.file_type().is_symlink() => {
+                skipped += 1;
+                if let Some(context) = context {
+                    context.mark_skipped(entry.path());
+                }
+            }
             Ok(entry) if entry.file_type().is_file() => match entry.metadata() {
                 Ok(metadata) => {
-                    size += metadata.len();
+                    let length = metadata.len();
+                    size += length;
                     files += 1;
+                    if let Some(context) = context {
+                        context.mark_file(entry.path(), length);
+                    }
                 }
-                Err(_) => skipped += 1,
+                Err(_) => {
+                    skipped += 1;
+                    if let Some(context) = context {
+                        context.mark_skipped(entry.path());
+                    }
+                }
             },
-            Ok(_) => {}
-            Err(_) => skipped += 1,
+            Ok(entry) => {
+                if entry.file_type().is_dir() {
+                    if let Some(context) = context {
+                        context.mark_folder(entry.path());
+                    }
+                }
+            }
+            Err(error) => {
+                skipped += 1;
+                if let Some(context) = context {
+                    context.mark_skipped(error.path().unwrap_or(path));
+                }
+            }
         }
     }
     (size, files, skipped)
+}
+
+fn cleanup_wiztree_csv_section(content: &str) -> Option<&str> {
+    let mut offset = 0;
+    for chunk in content.split_inclusive('\n') {
+        let line = chunk.trim_end_matches(['\r', '\n']);
+        let header = line
+            .trim_start_matches('\u{feff}')
+            .trim_start()
+            .trim_matches('"');
+        if header.starts_with("File Name,") || header.starts_with("File Name\",") {
+            return Some(&content[offset..]);
+        }
+        offset += chunk.len();
+    }
+    None
+}
+
+fn cleanup_wiztree_u64(value: Option<&str>) -> u64 {
+    value
+        .unwrap_or_default()
+        .chars()
+        .filter(|character| character.is_ascii_digit())
+        .collect::<String>()
+        .parse()
+        .unwrap_or(0)
+}
+
+fn cleanup_wiztree_column(headers: &csv::StringRecord, name: &str, fallback: usize) -> usize {
+    headers
+        .iter()
+        .position(|header| header.trim().trim_matches('"') == name)
+        .unwrap_or(fallback)
+}
+
+fn cleanup_wiztree_path_key(path: &str) -> String {
+    let mut value = path.trim().trim_matches('"').replace('/', "\\");
+    while value.len() > 3 && value.ends_with('\\') {
+        value.pop();
+    }
+    value.to_ascii_lowercase()
+}
+
+fn measure_path_with_wiztree(path: &Path, context: &CleanupScanContext) -> (u64, u64, u64) {
+    let cache_path = crate::wiztree::cache_path(&context.app, "leodisk-wiztree-cleanup-cache.csv");
+    let Some(exe) = crate::wiztree::executable(&context.app) else {
+        context.mark_skipped(path);
+        return (0, 0, 1);
+    };
+    if let Some(parent) = cache_path.parent() {
+        if fs::create_dir_all(parent).is_err() {
+            context.mark_skipped(path);
+            return (0, 0, 1);
+        }
+    }
+    let _ = fs::remove_file(&cache_path);
+    context.emit(path, "Menyiapkan cache CSV WizTree", true);
+    let mut command = crate::wiztree::command(&exe);
+    command.arg(path_display(path));
+    for arg in crate::wiztree::cli_args(&context.app, &cache_path) {
+        command.arg(arg);
+    }
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(_) => {
+            context.mark_skipped(path);
+            return (0, 0, 1);
+        }
+    };
+    let started = Instant::now();
+    loop {
+        if context.is_cancelled() {
+            let _ = child.kill();
+            let _ = child.wait();
+            return (0, 0, 1);
+        }
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => break,
+            Ok(Some(_)) | Err(_) => {
+                context.mark_skipped(path);
+                return (0, 0, 1);
+            }
+            Ok(None) => {
+                let phase = if started.elapsed() < Duration::from_secs(2) {
+                    "Menjalankan WizTree CLI"
+                } else if cache_path.is_file() {
+                    "WizTree menulis CSV cache"
+                } else {
+                    "Menunggu hasil scan WizTree"
+                };
+                context.emit(path, phase, true);
+                std::thread::sleep(Duration::from_millis(450));
+            }
+        }
+    }
+    context.emit(path, "Membaca CSV cache WizTree", true);
+    let Ok(content) = fs::read_to_string(&cache_path) else {
+        context.mark_skipped(path);
+        return (0, 0, 1);
+    };
+    let Some(section) = cleanup_wiztree_csv_section(&content) else {
+        context.mark_skipped(path);
+        return (0, 0, 1);
+    };
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(true)
+        .flexible(true)
+        .from_reader(section.as_bytes());
+    let Ok(headers) = reader.headers() else {
+        context.mark_skipped(path);
+        return (0, 0, 1);
+    };
+    let file_name_index = cleanup_wiztree_column(headers, "File Name", 0);
+    let size_index = cleanup_wiztree_column(headers, "Size", 1);
+    let files_index = cleanup_wiztree_column(headers, "Files", 5);
+    let root_key = cleanup_wiztree_path_key(&path_display(path));
+    let mut fallback_size = 0;
+    let mut fallback_files = 0;
+    for record in reader.records().flatten() {
+        let record_path = cleanup_wiztree_path_key(record.get(file_name_index).unwrap_or_default());
+        let size = cleanup_wiztree_u64(record.get(size_index));
+        let files = cleanup_wiztree_u64(record.get(files_index));
+        if record_path == root_key {
+            context.bytes_scanned.fetch_add(size, Ordering::Relaxed);
+            context.files_scanned.fetch_add(files, Ordering::Relaxed);
+            return (size, files, 0);
+        }
+        fallback_size += size;
+        if !record
+            .get(file_name_index)
+            .unwrap_or_default()
+            .ends_with(['\\', '/'])
+        {
+            fallback_files += 1;
+        }
+    }
+    context
+        .bytes_scanned
+        .fetch_add(fallback_size, Ordering::Relaxed);
+    context
+        .files_scanned
+        .fetch_add(fallback_files, Ordering::Relaxed);
+    (fallback_size, fallback_files, 0)
+}
+
+fn measure_path_with_engine(
+    path: &Path,
+    context: Option<&CleanupScanContext>,
+    engine: CleanupScanEngine,
+) -> (u64, u64, u64) {
+    match (engine, context) {
+        (CleanupScanEngine::WizTree, Some(context)) => measure_path_with_wiztree(path, context),
+        _ => measure_path_with_context(path, context),
+    }
 }
 
 struct MeasuredRoot {
@@ -1139,6 +1365,194 @@ struct MeasuredRoot {
     size_bytes: u64,
     file_count: u64,
     skipped_count: u64,
+}
+
+#[derive(Clone)]
+struct CleanupStores {
+    deletion_items: Arc<Mutex<HashMap<String, TrackedDeletion>>>,
+    known_locations: Arc<Mutex<HashMap<String, PathBuf>>>,
+    last_cleanup_report: Arc<Mutex<Option<CleanupReport>>>,
+}
+
+#[derive(Clone)]
+struct CleanupScanContext {
+    app: tauri::AppHandle,
+    job_id: String,
+    root_label: String,
+    cancelled: Arc<AtomicBool>,
+    roots_scanned: Arc<AtomicU64>,
+    folders_scanned: Arc<AtomicU64>,
+    files_scanned: Arc<AtomicU64>,
+    bytes_scanned: Arc<AtomicU64>,
+    skipped_count: Arc<AtomicU64>,
+    started_at: Instant,
+    last_emit: Arc<Mutex<Instant>>,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CleanupJobError {
+    job_id: String,
+    code: String,
+    message: String,
+}
+
+impl CleanupScanContext {
+    fn new(
+        app: tauri::AppHandle,
+        job_id: String,
+        root_label: String,
+        cancelled: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            app,
+            job_id,
+            root_label,
+            cancelled,
+            roots_scanned: Arc::new(AtomicU64::new(0)),
+            folders_scanned: Arc::new(AtomicU64::new(0)),
+            files_scanned: Arc::new(AtomicU64::new(0)),
+            bytes_scanned: Arc::new(AtomicU64::new(0)),
+            skipped_count: Arc::new(AtomicU64::new(0)),
+            started_at: Instant::now(),
+            last_emit: Arc::new(Mutex::new(Instant::now() - Duration::from_secs(1))),
+        }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Relaxed)
+    }
+
+    fn mark_root_done(&self, current: &Path) {
+        self.roots_scanned.fetch_add(1, Ordering::Relaxed);
+        self.emit(current, "Root selesai diproses", true);
+    }
+
+    fn mark_folder(&self, current: &Path) {
+        self.folders_scanned.fetch_add(1, Ordering::Relaxed);
+        self.emit(current, "Membaca folder", false);
+    }
+
+    fn mark_file(&self, current: &Path, size: u64) {
+        let files = self.files_scanned.fetch_add(1, Ordering::Relaxed) + 1;
+        self.bytes_scanned.fetch_add(size, Ordering::Relaxed);
+        if files % 128 == 0 {
+            self.emit(current, "Menghitung file", false);
+        }
+    }
+
+    fn mark_skipped(&self, current: &Path) {
+        self.skipped_count.fetch_add(1, Ordering::Relaxed);
+        self.emit(current, "Melewati path yang tidak dapat diakses", false);
+    }
+
+    fn emit(&self, current: &Path, phase: &str, force: bool) {
+        if !force {
+            let Ok(last) = self.last_emit.lock() else {
+                return;
+            };
+            if last.elapsed() < Duration::from_millis(220) {
+                return;
+            }
+        }
+        let Ok(mut last) = self.last_emit.lock() else {
+            return;
+        };
+        if !force && last.elapsed() < Duration::from_millis(120) {
+            return;
+        }
+        *last = Instant::now();
+        let _ = self.app.emit(
+            "cleanup-scan-progress",
+            CleanupScanProgress {
+                job_id: self.job_id.clone(),
+                root: self.root_label.clone(),
+                current_path: path_display(current),
+                phase: phase.into(),
+                elapsed_ms: self
+                    .started_at
+                    .elapsed()
+                    .as_millis()
+                    .min(u128::from(u64::MAX)) as u64,
+                roots_scanned: self.roots_scanned.load(Ordering::Relaxed),
+                folders_scanned: self.folders_scanned.load(Ordering::Relaxed),
+                files_scanned: self.files_scanned.load(Ordering::Relaxed),
+                bytes_scanned: self.bytes_scanned.load(Ordering::Relaxed),
+                skipped_count: self.skipped_count.load(Ordering::Relaxed),
+            },
+        );
+    }
+}
+
+#[derive(Clone)]
+struct CleanupDeleteContext {
+    app: tauri::AppHandle,
+    job_id: String,
+    total_items: u64,
+    processed_items: Arc<AtomicU64>,
+    affected_count: Arc<AtomicU64>,
+    reclaimed_bytes: Arc<AtomicU64>,
+    skipped_count: Arc<AtomicU64>,
+    last_emit: Arc<Mutex<Instant>>,
+}
+
+impl CleanupDeleteContext {
+    fn new(app: tauri::AppHandle, job_id: String, total_items: u64) -> Self {
+        Self {
+            app,
+            job_id,
+            total_items,
+            processed_items: Arc::new(AtomicU64::new(0)),
+            affected_count: Arc::new(AtomicU64::new(0)),
+            reclaimed_bytes: Arc::new(AtomicU64::new(0)),
+            skipped_count: Arc::new(AtomicU64::new(0)),
+            last_emit: Arc::new(Mutex::new(Instant::now() - Duration::from_secs(1))),
+        }
+    }
+
+    fn mark(&self, current: &Path, affected_delta: u64, reclaimed_delta: u64, skipped_delta: u64) {
+        self.processed_items.fetch_add(1, Ordering::Relaxed);
+        if affected_delta > 0 {
+            self.affected_count
+                .fetch_add(affected_delta, Ordering::Relaxed);
+        }
+        if reclaimed_delta > 0 {
+            self.reclaimed_bytes
+                .fetch_add(reclaimed_delta, Ordering::Relaxed);
+        }
+        if skipped_delta > 0 {
+            self.skipped_count
+                .fetch_add(skipped_delta, Ordering::Relaxed);
+        }
+        self.emit(current, true);
+    }
+
+    fn emit(&self, current: &Path, force: bool) {
+        if !force {
+            let Ok(last) = self.last_emit.lock() else {
+                return;
+            };
+            if last.elapsed() < Duration::from_millis(150) {
+                return;
+            }
+        }
+        let Ok(mut last) = self.last_emit.lock() else {
+            return;
+        };
+        *last = Instant::now();
+        let _ = self.app.emit(
+            "cleanup-delete-progress",
+            CleanupDeleteProgress {
+                job_id: self.job_id.clone(),
+                total_items: self.total_items,
+                processed_items: self.processed_items.load(Ordering::Relaxed),
+                affected_count: self.affected_count.load(Ordering::Relaxed),
+                reclaimed_bytes: self.reclaimed_bytes.load(Ordering::Relaxed),
+                skipped_count: self.skipped_count.load(Ordering::Relaxed),
+                current_path: path_display(current),
+            },
+        );
+    }
 }
 
 fn folder_child_root(parent: &ScanRoot, path: PathBuf, depth: usize) -> ScanRoot {
@@ -1183,11 +1597,21 @@ fn collect_child_folders(
     current: &Path,
     depth: usize,
     output: &mut Vec<ScanRoot>,
+    context: Option<&CleanupScanContext>,
 ) {
     if depth == 0 {
         return;
     }
+    if context
+        .map(CleanupScanContext::is_cancelled)
+        .unwrap_or(false)
+    {
+        return;
+    }
     let Ok(entries) = fs::read_dir(current) else {
+        if let Some(context) = context {
+            context.mark_skipped(current);
+        }
         return;
     };
     let mut folder_children = Vec::new();
@@ -1203,14 +1627,25 @@ fn collect_child_folders(
     }
     for path in folder_children {
         let before = output.len();
-        collect_child_folders(parent, &path, depth - 1, output);
+        collect_child_folders(parent, &path, depth - 1, output, context);
         if output.len() == before {
             output.push(folder_child_root(parent, path, depth));
         }
     }
 }
 
-fn measure_scan_root(root: ScanRoot) -> Vec<MeasuredRoot> {
+fn measure_scan_root_with_context(
+    root: ScanRoot,
+    context: Option<CleanupScanContext>,
+    engine: CleanupScanEngine,
+) -> Vec<MeasuredRoot> {
+    if context
+        .as_ref()
+        .map(CleanupScanContext::is_cancelled)
+        .unwrap_or(false)
+    {
+        return Vec::new();
+    }
     if root.expand_children && root.path.is_dir() {
         let mut child_folders = Vec::new();
         collect_child_folders(
@@ -1218,11 +1653,23 @@ fn measure_scan_root(root: ScanRoot) -> Vec<MeasuredRoot> {
             &root.path,
             CLEANUP_FOLDER_EXPANSION_DEPTH,
             &mut child_folders,
+            context.as_ref(),
         );
         let measured_children = child_folders
             .into_iter()
             .filter_map(|child| {
-                let (size_bytes, file_count, skipped_count) = measure_path(&child.path);
+                if context
+                    .as_ref()
+                    .map(CleanupScanContext::is_cancelled)
+                    .unwrap_or(false)
+                {
+                    return None;
+                }
+                let (size_bytes, file_count, skipped_count) =
+                    measure_path_with_engine(&child.path, context.as_ref(), engine);
+                if let Some(context) = context.as_ref() {
+                    context.mark_root_done(&child.path);
+                }
                 (file_count > 0 || skipped_count > 0).then_some(MeasuredRoot {
                     root: child,
                     size_bytes,
@@ -1235,7 +1682,11 @@ fn measure_scan_root(root: ScanRoot) -> Vec<MeasuredRoot> {
             return measured_children;
         }
     }
-    let (size_bytes, file_count, skipped_count) = measure_path(&root.path);
+    let (size_bytes, file_count, skipped_count) =
+        measure_path_with_engine(&root.path, context.as_ref(), engine);
+    if let Some(context) = context.as_ref() {
+        context.mark_root_done(&root.path);
+    }
     (file_count > 0 || skipped_count > 0)
         .then_some(MeasuredRoot {
             root,
@@ -1258,19 +1709,59 @@ fn dedupe_roots(roots: Vec<ScanRoot>) -> Vec<ScanRoot> {
         .collect()
 }
 
+fn stores_from_state(state: &AppState) -> CleanupStores {
+    CleanupStores {
+        deletion_items: state.deletion_items.clone(),
+        known_locations: state.known_locations.clone(),
+        last_cleanup_report: state.last_cleanup_report.clone(),
+    }
+}
+
 fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<CleanupReport> {
+    report_for_roots_with_stores(
+        roots,
+        stores_from_state(state),
+        None,
+        CleanupScanEngine::Native,
+    )
+}
+
+fn report_for_roots_with_stores(
+    roots: Vec<ScanRoot>,
+    stores: CleanupStores,
+    context: Option<CleanupScanContext>,
+    engine: CleanupScanEngine,
+) -> ApiResult<CleanupReport> {
     let started = timestamp();
     let timer = Instant::now();
-    let measured: Vec<MeasuredRoot> = dedupe_roots(roots)
-        .into_par_iter()
-        .map(measure_scan_root)
-        .flatten()
-        .collect();
-    let mut tracked = state
+    let deduped_roots = dedupe_roots(roots);
+    let measured: Vec<MeasuredRoot> = if engine == CleanupScanEngine::WizTree {
+        deduped_roots
+            .into_iter()
+            .flat_map(|root| measure_scan_root_with_context(root, context.clone(), engine))
+            .collect()
+    } else {
+        deduped_roots
+            .into_par_iter()
+            .map(|root| measure_scan_root_with_context(root, context.clone(), engine))
+            .flatten()
+            .collect()
+    };
+    if context
+        .as_ref()
+        .map(CleanupScanContext::is_cancelled)
+        .unwrap_or(false)
+    {
+        return Err(ApiError::new(
+            "CLEANUP_SCAN_CANCELLED",
+            "Pemindaian cleanup dibatalkan.",
+        ));
+    }
+    let mut tracked = stores
         .deletion_items
         .lock()
         .map_err(|_| ApiError::new("CLEANUP_LOCK", "Hasil pemindaian tidak dapat disimpan."))?;
-    let mut locations = state
+    let mut locations = stores
         .known_locations
         .lock()
         .map_err(|_| ApiError::new("LOCATION_LOCK", "Lokasi hasil pemindaian tidak tersedia."))?;
@@ -1336,18 +1827,54 @@ fn report_for_roots(roots: Vec<ScanRoot>, state: &AppState) -> ApiResult<Cleanup
         });
     }
     items.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
-    let report = build_report(items, started, timestamp(), timer.elapsed().as_millis());
-    if let Ok(mut last) = state.last_cleanup_report.lock() {
+    let cache_path = (engine == CleanupScanEngine::WizTree)
+        .then(|| {
+            context.as_ref().map(|context| {
+                path_display(&crate::wiztree::cache_path(
+                    &context.app,
+                    "leodisk-wiztree-cleanup-cache.csv",
+                ))
+            })
+        })
+        .flatten();
+    let report = build_report_with_metadata(
+        items,
+        started,
+        timestamp(),
+        timer.elapsed().as_millis(),
+        engine.label().into(),
+        cache_path,
+    );
+    if let Ok(mut last) = stores.last_cleanup_report.lock() {
         *last = Some(report.clone());
     }
     Ok(report)
 }
 
+#[cfg(test)]
 pub fn build_report(
+    all_items: Vec<CleanupItem>,
+    scan_started_at: String,
+    scan_finished_at: String,
+    duration_ms: u128,
+) -> CleanupReport {
+    build_report_with_metadata(
+        all_items,
+        scan_started_at,
+        scan_finished_at,
+        duration_ms,
+        "Native".into(),
+        None,
+    )
+}
+
+pub fn build_report_with_metadata(
     mut all_items: Vec<CleanupItem>,
     scan_started_at: String,
     scan_finished_at: String,
     duration_ms: u128,
+    scan_engine: String,
+    cache_path: Option<String>,
 ) -> CleanupReport {
     all_items.sort_by(|a, b| {
         b.priority
@@ -1441,6 +1968,8 @@ pub fn build_report(
         advisories,
         summary,
         category_totals,
+        scan_engine,
+        cache_path,
         scan_started_at,
         scan_finished_at,
         duration_ms,
@@ -1461,6 +1990,110 @@ pub fn scan_deep_cleanup(state: tauri::State<'_, AppState>) -> ApiResult<Cleanup
     let mut roots = cleanup_roots();
     roots.extend(advisory_roots());
     report_for_roots(roots, &state)
+}
+
+#[tauri::command]
+pub fn start_cleanup_scan(
+    scan_engine: Option<String>,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> ApiResult<ScanJob> {
+    let engine = CleanupScanEngine::from_request(scan_engine)?;
+    if engine == CleanupScanEngine::WizTree {
+        crate::wiztree::verify(&app)?;
+    }
+    let job_id = opaque_id("cleanup-scan", "deep-cleanup");
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let mut jobs = state
+        .cleanup_jobs
+        .lock()
+        .map_err(|_| ApiError::new("CLEANUP_SCAN_LOCK", "Scan cleanup tidak dapat dimulai."))?;
+    if !jobs.is_empty() {
+        return Err(ApiError::new(
+            "CLEANUP_SCAN_ALREADY_RUNNING",
+            "Scan cleanup masih berjalan. Tunggu selesai atau batalkan terlebih dahulu.",
+        ));
+    }
+    jobs.insert(job_id.clone(), cancelled.clone());
+    let job = ScanJob {
+        job_id: job_id.clone(),
+        root: "Deep Cleanup".into(),
+        engine: engine.label().into(),
+    };
+    *state.active_cleanup_scan.lock().map_err(|_| {
+        ApiError::new(
+            "CLEANUP_SCAN_LOCK",
+            "Status scan cleanup tidak dapat disimpan.",
+        )
+    })? = Some(job.clone());
+
+    let stores = stores_from_state(&state);
+    let cleanup_jobs = state.cleanup_jobs.clone();
+    let active_cleanup_scan = state.active_cleanup_scan.clone();
+    std::thread::spawn(move || {
+        let mut roots = cleanup_roots();
+        roots.extend(advisory_roots());
+        let context = CleanupScanContext::new(
+            app.clone(),
+            job_id.clone(),
+            format!("Deep Cleanup - {}", engine.label()),
+            cancelled,
+        );
+        let result = report_for_roots_with_stores(roots, stores, Some(context.clone()), engine);
+        match result {
+            Ok(report) => {
+                let _ = app.emit("cleanup-scan-complete", report);
+            }
+            Err(error) => {
+                let _ = app.emit(
+                    "cleanup-scan-error",
+                    CleanupJobError {
+                        job_id: job_id.clone(),
+                        code: error.code,
+                        message: error.message,
+                    },
+                );
+            }
+        }
+        if let Ok(mut jobs) = cleanup_jobs.lock() {
+            jobs.remove(&job_id);
+        }
+        if let Ok(mut active) = active_cleanup_scan.lock() {
+            *active = None;
+        }
+    });
+    Ok(job)
+}
+
+#[tauri::command]
+pub fn get_active_cleanup_scan(state: tauri::State<'_, AppState>) -> ApiResult<Option<ScanJob>> {
+    state
+        .active_cleanup_scan
+        .lock()
+        .map(|active| active.clone())
+        .map_err(|_| ApiError::new("CLEANUP_SCAN_LOCK", "Status scan cleanup tidak tersedia."))
+}
+
+#[tauri::command]
+pub fn cancel_cleanup_scan(
+    job_id: String,
+    state: tauri::State<'_, AppState>,
+) -> ApiResult<ActionReport> {
+    let jobs = state
+        .cleanup_jobs
+        .lock()
+        .map_err(|_| ApiError::new("CLEANUP_SCAN_LOCK", "Status scan cleanup tidak tersedia."))?;
+    let flag = jobs
+        .get(&job_id)
+        .ok_or_else(|| ApiError::new("CLEANUP_SCAN_NOT_FOUND", "Scan cleanup telah selesai."))?;
+    flag.store(true, Ordering::Relaxed);
+    Ok(ActionReport {
+        success: true,
+        message: "Permintaan pembatalan scan cleanup dikirim.".into(),
+        affected_count: 0,
+        reclaimed_bytes: 0,
+        skipped_count: 0,
+    })
 }
 
 pub fn report_remnant_paths(
@@ -1587,6 +2220,136 @@ fn last_report(state: &AppState) -> ApiResult<CleanupReport> {
         })
 }
 
+fn selected_cleanup_items(
+    item_ids: Vec<String>,
+    stores: &CleanupStores,
+) -> ApiResult<(HashSet<String>, HashMap<String, TrackedDeletion>)> {
+    let unique: HashSet<String> = item_ids.into_iter().collect();
+    let selected: HashMap<String, TrackedDeletion> = {
+        let tracked = stores
+            .deletion_items
+            .lock()
+            .map_err(|_| ApiError::new("CLEANUP_LOCK", "Hasil pemindaian tidak tersedia."))?;
+        unique
+            .iter()
+            .filter_map(|id| tracked.get(id).cloned().map(|item| (id.clone(), item)))
+            .collect()
+    };
+    if selected.len() != unique.len() {
+        return Err(ApiError::new(
+            "INVALID_CLEANUP_ITEMS",
+            "Pilihan tidak lagi valid. Silakan pindai ulang.",
+        ));
+    }
+    Ok((unique, selected))
+}
+
+fn is_nested_under_kept(item: &TrackedDeletion, kept: &[TrackedDeletion]) -> bool {
+    let path = normalized_path(&item.path);
+    kept.iter().any(|parent| {
+        let parent_path = normalized_path(&parent.path);
+        path != parent_path && path.starts_with(parent_path)
+    })
+}
+
+fn dedup_selected_items(selected: HashMap<String, TrackedDeletion>) -> Vec<TrackedDeletion> {
+    let mut items = selected.into_values().collect::<Vec<_>>();
+    items.sort_by_key(|item| normalized_path(&item.path).components().count());
+    let mut kept = Vec::new();
+    for item in items {
+        if !is_nested_under_kept(&item, &kept) {
+            kept.push(item);
+        }
+    }
+    kept
+}
+
+fn delete_selected_items(
+    unique: HashSet<String>,
+    selected: HashMap<String, TrackedDeletion>,
+    permanent: bool,
+    admin_confirmed: Option<bool>,
+    admin_confirmation_phrase: Option<String>,
+    stores: CleanupStores,
+    context: Option<CleanupDeleteContext>,
+) -> ApiResult<ActionReport> {
+    let mut affected = 0;
+    let mut skipped = 0;
+    let mut reclaimed = 0;
+    let admin_allowed =
+        admin_delete_confirmed(admin_confirmed, admin_confirmation_phrase.as_deref());
+    for item in dedup_selected_items(selected) {
+        let mut item_affected = 0;
+        let mut item_skipped = 0;
+        let mut item_reclaimed = 0;
+        if !item.clean_allowed
+            || (item.decision == "admin" && !admin_allowed)
+            || !valid_tracked_item(&item)
+        {
+            item_skipped += 1;
+        } else {
+            match item.mode {
+                DeleteMode::SelfItem => {
+                    if remove_one(&item.path, permanent) {
+                        item_affected += 1;
+                        item_reclaimed += item.estimated_bytes;
+                    } else {
+                        item_skipped += 1;
+                    }
+                }
+                DeleteMode::Children => match fs::read_dir(&item.path) {
+                    Ok(entries) => {
+                        let mut removed_any = false;
+                        for entry in entries.filter_map(Result::ok) {
+                            if remove_one(&entry.path(), permanent) {
+                                item_affected += 1;
+                                removed_any = true;
+                            } else {
+                                item_skipped += 1;
+                            }
+                        }
+                        if removed_any {
+                            item_reclaimed += item.estimated_bytes;
+                        }
+                    }
+                    Err(_) => item_skipped += 1,
+                },
+            }
+        }
+        affected += item_affected;
+        skipped += item_skipped;
+        reclaimed += item_reclaimed;
+        if let Some(context) = context.as_ref() {
+            context.mark(&item.path, item_affected, item_reclaimed, item_skipped);
+        }
+    }
+    if let Ok(mut tracked) = stores.deletion_items.lock() {
+        for id in &unique {
+            tracked.remove(id);
+        }
+    }
+    if let Ok(mut locations) = stores.known_locations.lock() {
+        for id in &unique {
+            locations.remove(id);
+        }
+    }
+    Ok(ActionReport {
+        success: affected > 0,
+        message: if affected == 0 {
+            "Tidak ada item yang dapat dihapus.".into()
+        } else if permanent {
+            format!("{affected} item dihapus permanen. {skipped} item dilewati atau terkunci.")
+        } else {
+            format!(
+                "{affected} item dipindahkan ke Recycle Bin. {skipped} item dilewati atau terkunci."
+            )
+        },
+        affected_count: affected,
+        reclaimed_bytes: reclaimed,
+        skipped_count: skipped,
+    })
+}
+
 fn export_dir() -> ApiResult<PathBuf> {
     let dir = env::temp_dir().join("LeoDisk");
     fs::create_dir_all(&dir)
@@ -1606,6 +2369,29 @@ fn export_action(path: &Path) -> ActionReport {
         reclaimed_bytes: 0,
         skipped_count: 0,
     }
+}
+
+#[tauri::command]
+pub fn open_exported_cleanup_file(path: String) -> ApiResult<ActionReport> {
+    let requested = normalized_path(Path::new(&path));
+    let allowed_dir = normalized_path(&export_dir()?);
+    if !requested.starts_with(&allowed_dir) || !requested.is_file() {
+        return Err(ApiError::new(
+            "EXPORT_OPEN_DENIED",
+            "File export tidak berada di folder laporan LeoDisk.",
+        ));
+    }
+    Command::new("explorer.exe")
+        .arg(&requested)
+        .spawn()
+        .map_err(|_| ApiError::new("EXPORT_OPEN_FAILED", "File export tidak dapat dibuka."))?;
+    Ok(ActionReport {
+        success: true,
+        message: "File export dibuka.".into(),
+        affected_count: 0,
+        reclaimed_bytes: 0,
+        skipped_count: 0,
+    })
 }
 
 fn escape_html(value: &str) -> String {
@@ -1703,92 +2489,104 @@ pub fn delete_cleanup_items(
     admin_confirmation_phrase: Option<String>,
     state: tauri::State<'_, AppState>,
 ) -> ApiResult<ActionReport> {
-    let unique: HashSet<String> = item_ids.into_iter().collect();
-    let selected: HashMap<String, TrackedDeletion> = {
-        let tracked = state
-            .deletion_items
-            .lock()
-            .map_err(|_| ApiError::new("CLEANUP_LOCK", "Hasil pemindaian tidak tersedia."))?;
-        unique
-            .iter()
-            .filter_map(|id| tracked.get(id).cloned().map(|item| (id.clone(), item)))
-            .collect()
-    };
-    if selected.len() != unique.len() {
+    let stores = stores_from_state(&state);
+    let (unique, selected) = selected_cleanup_items(item_ids, &stores)?;
+    delete_selected_items(
+        unique,
+        selected,
+        permanent,
+        admin_confirmed,
+        admin_confirmation_phrase,
+        stores,
+        None,
+    )
+}
+
+#[tauri::command]
+pub fn start_cleanup_delete(
+    item_ids: Vec<String>,
+    permanent: bool,
+    admin_confirmed: Option<bool>,
+    admin_confirmation_phrase: Option<String>,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> ApiResult<ScanJob> {
+    let stores = stores_from_state(&state);
+    let (unique, selected) = selected_cleanup_items(item_ids, &stores)?;
+    let job_id = opaque_id("cleanup-delete", &format!("{}-items", unique.len()));
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let mut jobs = state
+        .cleanup_delete_jobs
+        .lock()
+        .map_err(|_| ApiError::new("CLEANUP_DELETE_LOCK", "Proses hapus tidak dapat dimulai."))?;
+    if !jobs.is_empty() {
         return Err(ApiError::new(
-            "INVALID_CLEANUP_ITEMS",
-            "Pilihan tidak lagi valid. Silakan pindai ulang.",
+            "CLEANUP_DELETE_ALREADY_RUNNING",
+            "Proses hapus masih berjalan. Tunggu sampai selesai.",
         ));
     }
-    let mut affected = 0;
-    let mut skipped = 0;
-    let mut reclaimed = 0;
-    let admin_allowed =
-        admin_delete_confirmed(admin_confirmed, admin_confirmation_phrase.as_deref());
-    for item in selected.values() {
-        if !item.clean_allowed {
-            skipped += 1;
-            continue;
-        }
-        if item.decision == "admin" && !admin_allowed {
-            skipped += 1;
-            continue;
-        }
-        if !valid_tracked_item(item) {
-            skipped += 1;
-            continue;
-        }
-        match item.mode {
-            DeleteMode::SelfItem => {
-                if remove_one(&item.path, permanent) {
-                    affected += 1;
-                    reclaimed += item.estimated_bytes;
-                } else {
-                    skipped += 1;
-                }
+    jobs.insert(job_id.clone(), cancelled);
+    let job = ScanJob {
+        job_id: job_id.clone(),
+        root: format!("{} item terpilih", unique.len()),
+        engine: "Cleanup Delete".into(),
+    };
+    *state.active_cleanup_delete.lock().map_err(|_| {
+        ApiError::new(
+            "CLEANUP_DELETE_LOCK",
+            "Status hapus cleanup tidak dapat disimpan.",
+        )
+    })? = Some(job.clone());
+    let delete_jobs = state.cleanup_delete_jobs.clone();
+    let active_cleanup_delete = state.active_cleanup_delete.clone();
+    std::thread::spawn(move || {
+        let context = CleanupDeleteContext::new(app.clone(), job_id.clone(), unique.len() as u64);
+        let result = delete_selected_items(
+            unique,
+            selected,
+            permanent,
+            admin_confirmed,
+            admin_confirmation_phrase,
+            stores,
+            Some(context),
+        );
+        match result {
+            Ok(report) => {
+                let _ = app.emit("cleanup-delete-complete", report);
             }
-            DeleteMode::Children => match fs::read_dir(&item.path) {
-                Ok(entries) => {
-                    let mut removed_any = false;
-                    for entry in entries.filter_map(Result::ok) {
-                        if remove_one(&entry.path(), permanent) {
-                            affected += 1;
-                            removed_any = true;
-                        } else {
-                            skipped += 1;
-                        }
-                    }
-                    if removed_any {
-                        reclaimed += item.estimated_bytes;
-                    }
-                }
-                Err(_) => skipped += 1,
-            },
+            Err(error) => {
+                let _ = app.emit(
+                    "cleanup-delete-error",
+                    CleanupJobError {
+                        job_id: job_id.clone(),
+                        code: error.code,
+                        message: error.message,
+                    },
+                );
+            }
         }
-    }
-    if let Ok(mut tracked) = state.deletion_items.lock() {
-        for id in &unique {
-            tracked.remove(id);
+        if let Ok(mut jobs) = delete_jobs.lock() {
+            jobs.remove(&job_id);
         }
-    }
-    if let Ok(mut locations) = state.known_locations.lock() {
-        for id in &unique {
-            locations.remove(id);
+        if let Ok(mut active) = active_cleanup_delete.lock() {
+            *active = None;
         }
-    }
-    Ok(ActionReport {
-        success: affected > 0,
-        message: if affected == 0 {
-            "Tidak ada item yang dapat dihapus.".into()
-        } else if permanent {
-            "Item terpilih telah dihapus permanen.".into()
-        } else {
-            "Item terpilih dipindahkan ke Recycle Bin.".into()
-        },
-        affected_count: affected,
-        reclaimed_bytes: reclaimed,
-        skipped_count: skipped,
-    })
+    });
+    Ok(job)
+}
+
+#[tauri::command]
+pub fn get_active_cleanup_delete(state: tauri::State<'_, AppState>) -> ApiResult<Option<ScanJob>> {
+    state
+        .active_cleanup_delete
+        .lock()
+        .map(|active| active.clone())
+        .map_err(|_| {
+            ApiError::new(
+                "CLEANUP_DELETE_LOCK",
+                "Status hapus cleanup tidak tersedia.",
+            )
+        })
 }
 
 #[tauri::command]

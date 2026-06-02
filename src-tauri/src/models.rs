@@ -107,6 +107,8 @@ pub struct CleanupReport {
     pub advisories: Vec<CleanupItem>,
     pub summary: CleanupReportSummary,
     pub category_totals: Vec<CleanupCategoryTotal>,
+    pub scan_engine: String,
+    pub cache_path: Option<String>,
     pub total_bytes: u64,
     pub total_files: u64,
     pub skipped_count: u64,
@@ -184,6 +186,34 @@ pub struct StartupItem {
 pub struct ScanJob {
     pub job_id: String,
     pub root: String,
+    pub engine: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupScanProgress {
+    pub job_id: String,
+    pub root: String,
+    pub current_path: String,
+    pub phase: String,
+    pub elapsed_ms: u64,
+    pub roots_scanned: u64,
+    pub folders_scanned: u64,
+    pub files_scanned: u64,
+    pub bytes_scanned: u64,
+    pub skipped_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupDeleteProgress {
+    pub job_id: String,
+    pub total_items: u64,
+    pub processed_items: u64,
+    pub affected_count: u64,
+    pub reclaimed_bytes: u64,
+    pub skipped_count: u64,
+    pub current_path: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -243,6 +273,8 @@ pub struct DiskScanProgress {
 pub struct DiskScanResult {
     pub job_id: String,
     pub root: String,
+    pub engine: String,
+    pub cache_path: Option<String>,
     pub root_location_id: String,
     pub breadcrumbs: Vec<DiskBreadcrumb>,
     pub parent_location: Option<DiskBreadcrumb>,

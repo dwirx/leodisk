@@ -1,20 +1,20 @@
 use std::{
     collections::HashMap,
-    env,
+    env, fs,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
+    thread,
     time::{Duration, Instant},
 };
 
 use rayon::{prelude::*, ThreadPoolBuilder};
 use sysinfo::{DiskKind, Disks};
 use tauri::Emitter;
+use walkdir::WalkDir;
 
-#[cfg(not(windows))]
-use std::fs;
 #[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
 #[cfg(windows)]
@@ -49,6 +49,41 @@ const CATEGORY_INFO: [(&str, &str); CATEGORY_COUNT] = [
     ("Data aplikasi/cache", "mint"),
     ("Lainnya", "muted"),
 ];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DiskScanEngine {
+    Native,
+    Dust,
+    WizTree,
+}
+
+impl DiskScanEngine {
+    fn from_request(value: Option<String>) -> ApiResult<Self> {
+        match value
+            .as_deref()
+            .unwrap_or("native")
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "" | "native" => Ok(Self::Native),
+            "dust" | "dust-native" | "dustnative" => Ok(Self::Dust),
+            "wiztree" | "wiz-tree" => Ok(Self::WizTree),
+            _ => Err(ApiError::new(
+                "SCAN_ENGINE_UNSUPPORTED",
+                "Metode scan tidak dikenali.",
+            )),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Native => "Native",
+            Self::Dust => "Dust Native",
+            Self::WizTree => "WizTree CLI",
+        }
+    }
+}
 
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -189,6 +224,27 @@ fn emit_progress(
             bytes_scanned: counters.bytes.load(Ordering::Relaxed),
             inaccessible: counters.inaccessible.load(Ordering::Relaxed),
             current_path: path_display(current),
+        },
+    );
+}
+
+fn emit_wiztree_status(
+    app: &tauri::AppHandle,
+    job_id: &str,
+    root: &Path,
+    counters: &ScanCounters,
+    status: String,
+) {
+    let _ = app.emit(
+        "disk-scan-progress",
+        DiskScanProgress {
+            job_id: job_id.to_string(),
+            root: path_display(root),
+            files_scanned: counters.files.load(Ordering::Relaxed),
+            folders_scanned: counters.folders.load(Ordering::Relaxed),
+            bytes_scanned: counters.bytes.load(Ordering::Relaxed),
+            inaccessible: counters.inaccessible.load(Ordering::Relaxed),
+            current_path: status,
         },
     );
 }
@@ -412,9 +468,375 @@ fn parent_display(path: &Path) -> String {
     path.parent().map(path_display).unwrap_or_default()
 }
 
+fn scan_native_branches(
+    root: &Path,
+    cancelled: &AtomicBool,
+    counters: &ScanCounters,
+    app: &tauri::AppHandle,
+    job_id: &str,
+) -> Result<Vec<BranchResult>, DiskScanError> {
+    let entries = read_native_entries(root).map_err(|_| DiskScanError {
+        job_id: job_id.to_string(),
+        code: "SCAN_READ_FAILED".into(),
+        message: "Folder tidak dapat dibaca.".into(),
+    })?;
+    let scan_entries = || {
+        entries
+            .par_iter()
+            .map(|entry| scan_branch(entry, root, cancelled, counters, app, job_id))
+            .collect::<Vec<_>>()
+    };
+    Ok(ThreadPoolBuilder::new()
+        .num_threads(scan_worker_count(root))
+        .build()
+        .map(|pool| pool.install(scan_entries))
+        .unwrap_or_else(|_| {
+            entries
+                .iter()
+                .map(|entry| scan_branch(entry, root, cancelled, counters, app, job_id))
+                .collect()
+        }))
+}
+
+fn add_folder_total(
+    folders: &mut HashMap<String, (PathBuf, u64, u64)>,
+    folder: &Path,
+    root: &Path,
+    size_bytes: u64,
+) {
+    if !folder.starts_with(root) {
+        return;
+    }
+    let normalized = normalized_path(folder);
+    let key = path_display(&normalized).to_lowercase();
+    let entry = folders.entry(key).or_insert((normalized, 0, 0));
+    entry.1 = entry.1.saturating_add(size_bytes);
+    entry.2 = entry.2.saturating_add(1);
+}
+
+fn scan_dust_branches(
+    root: &Path,
+    cancelled: &AtomicBool,
+    counters: &ScanCounters,
+    app: &tauri::AppHandle,
+    job_id: &str,
+) -> Result<Vec<BranchResult>, DiskScanError> {
+    if !root.is_dir() {
+        return Err(DiskScanError {
+            job_id: job_id.to_string(),
+            code: "SCAN_READ_FAILED".into(),
+            message: "Folder tidak dapat dibaca.".into(),
+        });
+    }
+    let mut result = BranchResult::new(root.to_path_buf());
+    let mut folder_totals: HashMap<String, (PathBuf, u64, u64)> = HashMap::new();
+    for entry in WalkDir::new(root).follow_links(false).into_iter() {
+        if cancelled.load(Ordering::Relaxed) {
+            break;
+        }
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => {
+                result.inaccessible += 1;
+                counters.inaccessible.fetch_add(1, Ordering::Relaxed);
+                continue;
+            }
+        };
+        let path = entry.path();
+        let file_type = entry.file_type();
+        if file_type.is_dir() {
+            counters.folders.fetch_add(1, Ordering::Relaxed);
+            continue;
+        }
+        if !file_type.is_file() {
+            result.inaccessible += 1;
+            counters.inaccessible.fetch_add(1, Ordering::Relaxed);
+            continue;
+        }
+        let size = match entry.metadata() {
+            Ok(metadata) => metadata.len(),
+            Err(_) => {
+                result.inaccessible += 1;
+                counters.inaccessible.fetch_add(1, Ordering::Relaxed);
+                continue;
+            }
+        };
+        add_file(
+            &mut result,
+            path,
+            size,
+            root,
+            cancelled,
+            counters,
+            app,
+            job_id,
+        );
+        let mut current = path.parent();
+        while let Some(folder) = current {
+            add_folder_total(&mut folder_totals, folder, root, size);
+            if same_filesystem_root(folder, root) {
+                break;
+            }
+            current = folder.parent();
+        }
+    }
+    result.folders = folder_totals.into_values().collect();
+    Ok(vec![result])
+}
+
+fn same_filesystem_root(left: &Path, right: &Path) -> bool {
+    path_display(&normalized_path(left))
+        .eq_ignore_ascii_case(&path_display(&normalized_path(right)))
+}
+
+fn parse_wiztree_u64(value: Option<&str>) -> u64 {
+    value
+        .unwrap_or_default()
+        .chars()
+        .filter(|character| character.is_ascii_digit())
+        .collect::<String>()
+        .parse()
+        .unwrap_or(0)
+}
+
+fn trim_wiztree_folder_path(path: &str) -> String {
+    let mut value = path.trim().trim_matches('"').to_string();
+    while value.len() > 3 && (value.ends_with('\\') || value.ends_with('/')) {
+        value.pop();
+    }
+    value
+}
+
+fn is_wiztree_header_line(line: &str) -> bool {
+    let trimmed = line
+        .trim_start_matches('\u{feff}')
+        .trim_start()
+        .trim_matches('"');
+    trimmed.starts_with("File Name,") || trimmed.starts_with("File Name\",")
+}
+
+fn wiztree_csv_data_section(content: &str) -> Option<&str> {
+    let mut offset = 0;
+    for chunk in content.split_inclusive('\n') {
+        let line = chunk.trim_end_matches(['\r', '\n']);
+        if is_wiztree_header_line(line) {
+            return Some(&content[offset..]);
+        }
+        offset += chunk.len();
+    }
+    if offset < content.len() {
+        let line = &content[offset..];
+        if is_wiztree_header_line(line) {
+            return Some(line);
+        }
+    }
+    None
+}
+
+fn wiztree_column_index(headers: &csv::StringRecord, name: &str, fallback: usize) -> usize {
+    headers
+        .iter()
+        .position(|header| header.trim().trim_matches('"') == name)
+        .unwrap_or(fallback)
+}
+
+fn run_wiztree_export(
+    root: &Path,
+    cache_path: &Path,
+    cancelled: &AtomicBool,
+    counters: &ScanCounters,
+    app: &tauri::AppHandle,
+    job_id: &str,
+) -> Result<(), DiskScanError> {
+    let exe = crate::wiztree::executable(app).ok_or_else(|| DiskScanError {
+        job_id: String::new(),
+        code: "WIZTREE_NOT_FOUND".into(),
+        message: "WizTree portable belum ditemukan. Download portable resmi dari panel WizTree, lalu scan ulang.".into(),
+    })?;
+    if let Some(parent) = cache_path.parent() {
+        fs::create_dir_all(parent).map_err(|_| DiskScanError {
+            job_id: String::new(),
+            code: "WIZTREE_CACHE_FAILED".into(),
+            message: "Folder cache WizTree tidak dapat dibuat.".into(),
+        })?;
+    }
+    let _ = fs::remove_file(cache_path);
+    let mut command = crate::wiztree::command(&exe);
+    command.arg(path_display(root));
+    for arg in crate::wiztree::cli_args(app, cache_path) {
+        command.arg(arg);
+    }
+    let mut child = command.spawn().map_err(|_| DiskScanError {
+        job_id: String::new(),
+        code: "WIZTREE_START_FAILED".into(),
+        message: "WizTree CLI tidak dapat dijalankan.".into(),
+    })?;
+    let started = Instant::now();
+    loop {
+        if cancelled.load(Ordering::Relaxed) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(DiskScanError {
+                job_id: String::new(),
+                code: "SCAN_CANCELLED".into(),
+                message: "Pemindaian dibatalkan.".into(),
+            });
+        }
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => break,
+            Ok(Some(_)) => {
+                return Err(DiskScanError {
+                    job_id: String::new(),
+                    code: "WIZTREE_EXPORT_FAILED".into(),
+                    message: "WizTree gagal membuat CSV scan.".into(),
+                });
+            }
+            Ok(None) => {
+                let elapsed = started.elapsed().as_secs();
+                let status = if elapsed < 2 {
+                    format!("Menjalankan WizTree CLI untuk {}", path_display(root))
+                } else if cache_path.is_file() {
+                    format!("WizTree menulis CSV cache - {}s", elapsed)
+                } else {
+                    format!("Menunggu hasil scan WizTree - {}s", elapsed)
+                };
+                emit_wiztree_status(app, job_id, root, counters, status);
+                thread::sleep(Duration::from_millis(500));
+            }
+            Err(_) => {
+                return Err(DiskScanError {
+                    job_id: String::new(),
+                    code: "WIZTREE_WAIT_FAILED".into(),
+                    message: "Status proses WizTree tidak dapat dibaca.".into(),
+                });
+            }
+        }
+    }
+    if !cache_path.is_file() {
+        return Err(DiskScanError {
+            job_id: String::new(),
+            code: "WIZTREE_EXPORT_MISSING".into(),
+            message: "CSV WizTree tidak ditemukan setelah scan selesai.".into(),
+        });
+    }
+    Ok(())
+}
+
+fn scan_wiztree_branches(
+    root: &Path,
+    cancelled: &AtomicBool,
+    counters: &ScanCounters,
+    app: &tauri::AppHandle,
+    job_id: &str,
+) -> Result<(Vec<BranchResult>, PathBuf), DiskScanError> {
+    #[cfg(not(windows))]
+    {
+        let _ = (root, cancelled, counters, app);
+        return Err(DiskScanError {
+            job_id: job_id.to_string(),
+            code: "WIZTREE_WINDOWS_ONLY".into(),
+            message: "WizTree CLI hanya tersedia di Windows.",
+        });
+    }
+    #[cfg(windows)]
+    {
+        let cache_path = crate::wiztree::cache_path(app, "leodisk-wiztree-scan-cache.csv");
+        emit_wiztree_status(
+            app,
+            job_id,
+            root,
+            counters,
+            "Menyiapkan cache CSV WizTree".into(),
+        );
+        run_wiztree_export(root, &cache_path, cancelled, counters, app, job_id).map_err(
+            |mut error| {
+                error.job_id = job_id.to_string();
+                error
+            },
+        )?;
+        emit_wiztree_status(
+            app,
+            job_id,
+            root,
+            counters,
+            "Membaca CSV cache WizTree".into(),
+        );
+        let content = fs::read_to_string(&cache_path).map_err(|_| DiskScanError {
+            job_id: job_id.to_string(),
+            code: "WIZTREE_CSV_READ_FAILED".into(),
+            message: "CSV WizTree tidak dapat dibaca.".into(),
+        })?;
+        let data_section = wiztree_csv_data_section(&content).ok_or_else(|| DiskScanError {
+            job_id: job_id.to_string(),
+            code: "WIZTREE_CSV_HEADER_MISSING".into(),
+            message: "Header CSV WizTree tidak ditemukan.".into(),
+        })?;
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .flexible(true)
+            .from_reader(data_section.as_bytes());
+        let headers = reader.headers().map_err(|_| DiskScanError {
+            job_id: job_id.to_string(),
+            code: "WIZTREE_CSV_HEADER_FAILED".into(),
+            message: "Header CSV WizTree tidak dapat dibaca.".into(),
+        })?;
+        let file_name_index = wiztree_column_index(headers, "File Name", 0);
+        let size_index = wiztree_column_index(headers, "Size", 1);
+        let files_index = wiztree_column_index(headers, "Files", 5);
+        let mut result = BranchResult::new(root.to_path_buf());
+        for record in reader.records() {
+            if cancelled.load(Ordering::Relaxed) {
+                return Err(DiskScanError {
+                    job_id: job_id.to_string(),
+                    code: "SCAN_CANCELLED".into(),
+                    message: "Pemindaian dibatalkan.".into(),
+                });
+            }
+            let record = match record {
+                Ok(record) => record,
+                Err(_) => {
+                    result.inaccessible += 1;
+                    counters.inaccessible.fetch_add(1, Ordering::Relaxed);
+                    continue;
+                }
+            };
+            let Some(raw_path) = record.get(file_name_index) else {
+                continue;
+            };
+            if raw_path.trim().is_empty() {
+                continue;
+            }
+            let is_folder = raw_path.ends_with('\\') || raw_path.ends_with('/');
+            let path = PathBuf::from(trim_wiztree_folder_path(raw_path));
+            let size = parse_wiztree_u64(record.get(size_index));
+            if is_folder {
+                counters.folders.fetch_add(1, Ordering::Relaxed);
+                result.folders.push((
+                    normalized_path(&path),
+                    size,
+                    parse_wiztree_u64(record.get(files_index)),
+                ));
+            } else {
+                add_file(
+                    &mut result,
+                    &path,
+                    size,
+                    root,
+                    cancelled,
+                    counters,
+                    app,
+                    job_id,
+                );
+            }
+        }
+        Ok((vec![result], cache_path))
+    }
+}
+
 fn scan(
     job_id: String,
     root: PathBuf,
+    engine: DiskScanEngine,
     cancelled: Arc<AtomicBool>,
     app: tauri::AppHandle,
     deletion_items: Arc<Mutex<HashMap<String, TrackedDeletion>>>,
@@ -422,26 +844,6 @@ fn scan(
     disk_jobs: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
     active_disk_scan: Arc<Mutex<Option<ScanJob>>>,
 ) {
-    let entries = match read_native_entries(&root) {
-        Ok(entries) => entries,
-        Err(_) => {
-            let _ = app.emit(
-                "disk-scan-error",
-                DiskScanError {
-                    job_id: job_id.clone(),
-                    code: "SCAN_READ_FAILED".into(),
-                    message: "Folder tidak dapat dibaca.".into(),
-                },
-            );
-            if let Ok(mut jobs) = disk_jobs.lock() {
-                jobs.remove(&job_id);
-            }
-            if let Ok(mut active) = active_disk_scan.lock() {
-                *active = None;
-            }
-            return;
-        }
-    };
     let counters = ScanCounters {
         files: AtomicU64::new(0),
         folders: AtomicU64::new(1),
@@ -449,22 +851,88 @@ fn scan(
         inaccessible: AtomicU64::new(0),
         last_emit: Mutex::new(Instant::now() - Duration::from_secs(1)),
     };
-    let scan_entries = || {
-        entries
-            .par_iter()
-            .map(|entry| scan_branch(entry, &root, &cancelled, &counters, &app, &job_id))
-            .collect::<Vec<_>>()
+    let (branches, cache_path) = match engine {
+        DiskScanEngine::Native => {
+            match scan_native_branches(&root, &cancelled, &counters, &app, &job_id) {
+                Ok(branches) => (branches, None),
+                Err(error) => {
+                    let _ = app.emit("disk-scan-error", error);
+                    if let Ok(mut jobs) = disk_jobs.lock() {
+                        jobs.remove(&job_id);
+                    }
+                    if let Ok(mut active) = active_disk_scan.lock() {
+                        *active = None;
+                    }
+                    return;
+                }
+            }
+        }
+        DiskScanEngine::Dust => {
+            match scan_dust_branches(&root, &cancelled, &counters, &app, &job_id) {
+                Ok(branches) => (branches, None),
+                Err(error) => {
+                    let _ = app.emit("disk-scan-error", error);
+                    if let Ok(mut jobs) = disk_jobs.lock() {
+                        jobs.remove(&job_id);
+                    }
+                    if let Ok(mut active) = active_disk_scan.lock() {
+                        *active = None;
+                    }
+                    return;
+                }
+            }
+        }
+        DiskScanEngine::WizTree => {
+            match scan_wiztree_branches(&root, &cancelled, &counters, &app, &job_id) {
+                Ok((branches, cache_path)) => (branches, Some(cache_path)),
+                Err(error) => {
+                    let _ = app.emit("disk-scan-error", error);
+                    if let Ok(mut jobs) = disk_jobs.lock() {
+                        jobs.remove(&job_id);
+                    }
+                    if let Ok(mut active) = active_disk_scan.lock() {
+                        *active = None;
+                    }
+                    return;
+                }
+            }
+        }
     };
-    let branches = ThreadPoolBuilder::new()
-        .num_threads(scan_worker_count(&root))
-        .build()
-        .map(|pool| pool.install(scan_entries))
-        .unwrap_or_else(|_| {
-            entries
-                .iter()
-                .map(|entry| scan_branch(entry, &root, &cancelled, &counters, &app, &job_id))
-                .collect()
-        });
+    if cancelled.load(Ordering::Relaxed) {
+        let _ = app.emit(
+            "disk-scan-error",
+            DiskScanError {
+                job_id: job_id.clone(),
+                code: "SCAN_CANCELLED".into(),
+                message: "Pemindaian dibatalkan.".into(),
+            },
+        );
+        if let Ok(mut jobs) = disk_jobs.lock() {
+            jobs.remove(&job_id);
+        }
+        if let Ok(mut active) = active_disk_scan.lock() {
+            *active = None;
+        }
+        return;
+    }
+    if branches.is_empty() {
+        let _ = app.emit(
+            "disk-scan-error",
+            DiskScanError {
+                job_id: job_id.clone(),
+                code: "SCAN_EMPTY".into(),
+                message: "Tidak ada data scan yang dapat dibaca.".into(),
+            },
+        );
+        if let Ok(mut jobs) = disk_jobs.lock() {
+            jobs.remove(&job_id);
+        }
+        if let Ok(mut active) = active_disk_scan.lock() {
+            *active = None;
+        }
+        return;
+    }
+    let cache_path = cache_path.map(|path| path_display(&path));
     if cancelled.load(Ordering::Relaxed) {
         let _ = app.emit(
             "disk-scan-error",
@@ -622,6 +1090,8 @@ fn scan(
         DiskScanResult {
             job_id: job_id.clone(),
             root: path_display(&root),
+            engine: engine.label().into(),
+            cache_path,
             root_location_id,
             breadcrumbs,
             parent_location,
@@ -645,9 +1115,11 @@ fn scan(
 #[tauri::command]
 pub fn start_disk_scan(
     root: String,
+    scan_engine: Option<String>,
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> ApiResult<ScanJob> {
+    let engine = DiskScanEngine::from_request(scan_engine)?;
     let requested = if root.trim().is_empty() {
         env::var("USERPROFILE").map(PathBuf::from).map_err(|_| {
             ApiError::new("HOME_NOT_FOUND", "Folder profil pengguna tidak ditemukan.")
@@ -661,6 +1133,9 @@ pub fn start_disk_scan(
             "INVALID_SCAN_ROOT",
             "Pilih folder atau drive yang dapat dibaca.",
         ));
+    }
+    if engine == DiskScanEngine::WizTree {
+        crate::wiztree::verify(&app)?;
     }
     let job_id = opaque_id("scan", &path_display(&root));
     let cancelled = Arc::new(AtomicBool::new(false));
@@ -678,6 +1153,7 @@ pub fn start_disk_scan(
     let result = ScanJob {
         job_id: job_id.clone(),
         root: path_display(&root),
+        engine: engine.label().into(),
     };
     *state
         .active_disk_scan
@@ -692,6 +1168,7 @@ pub fn start_disk_scan(
         scan(
             job_id,
             root,
+            engine,
             cancelled,
             app,
             deletion_items,
@@ -765,12 +1242,29 @@ mod tests {
     }
 
     #[test]
+    fn wiztree_csv_section_skips_generated_banner() {
+        let csv = "Generated by WizTree 4.31\r\nFile Name,Size,Allocated,Modified,Attributes,Files,Folders\r\n\"C:\\Temp\\\",9,0,2026/06/02 03:46:07,0,1,0\r\n\"C:\\Temp\\sample.txt\",9,0,2026/06/02 03:46:07,0,0,0\r\n";
+        let section = wiztree_csv_data_section(csv).expect("wiztree data section");
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_reader(section.as_bytes());
+        let headers = reader.headers().expect("headers");
+        assert_eq!(wiztree_column_index(headers, "File Name", 99), 0);
+        assert_eq!(wiztree_column_index(headers, "Size", 99), 1);
+        let rows = reader.records().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].get(0), Some(r"C:\Temp\"));
+        assert_eq!(parse_wiztree_u64(rows[1].get(1)), 9);
+    }
+
+    #[test]
     fn active_scan_status_returns_current_job() {
         let state = AppState::default();
         assert!(active_disk_scan(&state).unwrap().is_none());
         *state.active_disk_scan.lock().unwrap() = Some(ScanJob {
             job_id: "job-1".into(),
             root: r"C:\".into(),
+            engine: "Native".into(),
         });
         let active = active_disk_scan(&state).unwrap().expect("active job");
         assert_eq!(active.job_id, "job-1");

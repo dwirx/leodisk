@@ -1,0 +1,894 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: Pornchai Petthaveeporndej\n"
+"Language: th\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 3.5\n"
+
+#: WizTreeMain.pas:673
+msgid "Scanning..."
+msgstr "กำลังสแกน..."
+
+#: WizTreeMain.pas:673 WizTreeMain.pas:4286
+msgid "Folders"
+msgstr "โฟลเดอร์"
+
+#: WizTreeMain.pas:673 WizTreeMain.pas:4283
+msgid "Files"
+msgstr "ไฟล์"
+
+#: WizTreeMain.pas:688
+msgid "Dumping file"
+msgstr "การดัมพ์ไฟล์"
+
+#: WizTreeMain.pas:688 WizTreeMain.pas:953
+msgid "MB"
+msgstr "MB"
+
+#: WizTreeMain.pas:950
+msgid "GB"
+msgstr "GB"
+
+#: WizTreeMain.pas:956
+msgid "KB"
+msgstr "KB"
+
+#: WizTreeMain.pas:961
+msgid "Bytes"
+msgstr "ไบต์"
+
+#: WizTreeMain.pas:1141
+msgid "Files in"
+msgstr "ไฟล์ใน"
+
+#: WizTreeMain.pas:1143
+msgid "File in"
+msgstr "ยื่นเอกสารใน"
+
+#: WizTreeMain.pas:1691 WizTreeMain.pas:1738
+msgid "Selected Files"
+msgstr "ไฟล์ที่เลือก"
+
+#: WizTreeMain.pas:1691 WizTreeMain.pas:1738 WizTreeMain.pas:3593
+msgid "Total Size"
+msgstr "ขนาดทั้งหมด"
+
+#: WizTreeMain.pas:1874 WizTreeMain.pas:1976 WizTreeMain.pas:2033
+msgid "You are about to open"
+msgstr "คุณกำลังจะเปิด"
+
+#: WizTreeMain.pas:1875
+msgid "Command Prompt windows - are you sure?"
+msgstr "หน้าต่าง Command Prompt - คุณแน่ใจหรือเปล่า?"
+
+#: WizTreeMain.pas:1977
+msgid "Explorer windows - are you sure?"
+msgstr "หน้าต่าง Explorer - คุณแน่ใจหรือเปล่า?"
+
+#: WizTreeMain.pas:2034
+msgid "files - are you sure?"
+msgstr "ไฟล์ - คุณแน่ใจเหรอ?"
+
+#. FileName := FDir;
+#. 2 = select directory
+#: WizTreeMain.pas:2147 WizTreeMain.pas:2162 WizTreeMain.pas:3041
+msgid "Select Folder"
+msgstr "เลือกโฟลเดอร์"
+
+#. YMMV
+#: WizTreeMain.pas:2149
+msgid "Select"
+msgstr "เลือก"
+
+#: WizTreeMain.pas:2202
+msgid "File not found"
+msgstr "ไม่พบไฟล์"
+
+#: WizTreeMain.pas:2326
+msgid "Error"
+msgstr "ข้อผิดพลาด"
+
+#: WizTreeMain.pas:2351
+msgid "Sorting file list..."
+msgstr "กำลังเรียงลำดับรายการไฟล์..."
+
+#: WizTreeMain.pas:2362
+msgid "Loading tree..."
+msgstr "กำลังโหลดโครงสร้างต้นไม้..."
+
+#: WizTreeMain.pas:2406
+msgid "Scan complete in"
+msgstr "การสแกนเสร็จสมบูรณ์ใน"
+
+#: WizTreeMain.pas:2408
+msgid "seconds"
+msgstr "วินาที"
+
+#: WizTreeMain.pas:2412
+msgid "canceled"
+msgstr "ยกเลิก"
+
+#: WizTreeMain.pas:2480
+msgid "Failed to update Windows Explorer context menu"
+msgstr "ไม่สามารถอัปเดตเมนูบริบทของ Windows Explorer ได้"
+
+#: WizTreeMain.pas:2560
+msgid "No MFT root found!"
+msgstr "ไม่พบราก MFT!"
+
+#. we have an update!
+#: WizTreeMain.pas:2640
+msgid "An update is available"
+msgstr "มีการอัปเดตให้ใช้งานได้แล้ว"
+
+#: WizTreeMain.pas:2641
+msgid "Click on the \"View Update\" button to learn more."
+msgstr "คลิกที่ปุ่ม \"ดูข้อมูลอัปเดต\" เพื่อเรียนรู้เพิ่มเติม"
+
+#. if tag set then display error if any
+#: WizTreeMain.pas:2648
+msgid "No update found."
+msgstr "ไม่พบข้อมูลอัปเดต"
+
+#. if tag set then display error if any
+#: WizTreeMain.pas:2660
+msgid "Error checking for updates:"
+msgstr "เกิดข้อผิดพลาดในการตรวจสอบการอัปเดต:"
+
+#: WizTreeMain.pas:2836
+msgid "Please restart WizTree as Administrator to dump the MFT file"
+msgstr "โปรดรีสตาร์ท WizTree ในฐานะผู้ดูแลระบบเพื่อดัมพ์ไฟล์ MFT"
+
+#: WizTreeMain.pas:2844
+msgid "Please select an NTFS formatted drive."
+msgstr "โปรดเลือกไดรฟ์ที่ฟอร์แมตด้วยระบบไฟล์ NTFS"
+
+#: WizTreeMain.pas:2869
+msgid "Dumping MFT file, please wait..."
+msgstr "กำลังดัมพ์ไฟล์ MFT โปรดรอสักครู่..."
+
+#: WizTreeMain.pas:2880
+msgid "MFT data dump complete."
+msgstr "การถ่ายโอนข้อมูล MFT เสร็จสมบูรณ์แล้ว"
+
+#: WizTreeMain.pas:2884
+msgid "MFT data dumped to file"
+msgstr "ข้อมูล MFT ถูกบันทึกลงไฟล์แล้ว"
+
+#: WizTreeMain.pas:2991
+msgid "64 bit"
+msgstr "64 บิต"
+
+#: WizTreeMain.pas:2993
+msgid "32 bit"
+msgstr "32 บิต"
+
+#: WizTreeMain.pas:3042
+msgid "MFT file"
+msgstr "ไฟล์ MFT"
+
+#: WizTreeMain.pas:3487
+msgid "Loading file list..."
+msgstr "กำลังโหลดรายการไฟล์..."
+
+#: WizTreeMain.pas:3592
+msgid "files"
+msgstr "ไฟล์"
+
+#. lblTotalSpacePerc.Caption := '';
+#: WizTreeMain.pas:3636 WizTreeMain.pas:3637 WizTreeMain.pas:3658
+#: WizTreeMain.pas:3663 WizTreeMain.pas:3666 WizTreeMain.pas:3674
+#: WizTreeMain.pas:3675 WizTreeMain.pas:3677 WizTreeMain.pas:3679
+#: WizTreeMain.pas:3681 WizTreeMain.pas:4268 WizTreeMain.pas:4269
+#: WizTreeMain.pas:4270 WizTreeMain.pas:4271 WizTreeMain.pas:4272
+#: WizTreeMain.pas:4273 WizTreeMain.pas:4274
+msgid "n/a"
+msgstr "ไม่มีข้อมูล"
+
+#: WizTreeMain.pas:3648
+msgid "<Folder>"
+msgstr "<โฟลเดอร์>"
+
+#: WizTreeMain.pas:4228
+msgid "File"
+msgstr "ไฟล์"
+
+#: WizTreeMain.pas:4229
+msgid "Options"
+msgstr "ตัวเลือก"
+
+#: WizTreeMain.pas:4230 WizTreeMain.pas:4260
+msgid "Scan"
+msgstr "สแกน"
+
+#: WizTreeMain.pas:4231
+msgid "New Instance"
+msgstr "อินสแตนซ์ใหม่"
+
+#: WizTreeMain.pas:4232
+msgid "Explore Folder"
+msgstr "สำรวจโฟลเดอร์"
+
+#: WizTreeMain.pas:4233
+msgid "Command Prompt Here"
+msgstr "พร้อมท์คำสั่งที่นี่"
+
+#: WizTreeMain.pas:4234
+msgid "Copy Path"
+msgstr "คัดลอกเส้นทาง"
+
+#: WizTreeMain.pas:4235
+msgid "Delete (to Recycle Bin)"
+msgstr "ลบ (ไปยังถังรีไซเคิล)"
+
+#: WizTreeMain.pas:4236
+msgid "Delete (No undelete possible)"
+msgstr "ลบ (ไม่สามารถกู้คืนได้)"
+
+#: WizTreeMain.pas:4237
+msgid "Dump MFT File"
+msgstr "ดัมพ์ไฟล์ MFT"
+
+#: WizTreeMain.pas:4238
+msgid "Exit"
+msgstr "ทางออก"
+
+#: WizTreeMain.pas:4240
+msgid "Display Dynamic values"
+msgstr "แสดงค่าแบบไดนามิก"
+
+#: WizTreeMain.pas:4241
+msgid "Display Byte values"
+msgstr "ค่าไบต์ที่แสดง"
+
+#: WizTreeMain.pas:4242
+msgid "Display KB values"
+msgstr "แสดงค่า KB"
+
+#: WizTreeMain.pas:4243
+msgid "Display MB values"
+msgstr "แสดงค่า MB"
+
+#: WizTreeMain.pas:4244
+msgid "Display GB values"
+msgstr "แสดงค่า GB"
+
+#: WizTreeMain.pas:4245
+msgid "Windows Explorer context menu"
+msgstr "เมนูบริบทของ Windows Explorer"
+
+#: WizTreeMain.pas:4246
+msgid "Always Run as Administrator"
+msgstr "เรียกใช้ในฐานะผู้ดูแลระบบเสมอ"
+
+#: WizTreeMain.pas:4248
+msgid "Language"
+msgstr "ภาษา"
+
+#: WizTreeMain.pas:4250
+msgid "Restart as Administrator"
+msgstr "รีสตาร์ทในฐานะผู้ดูแลระบบ"
+
+#: WizTreeMain.pas:4251
+msgid "WizTree requires \"Administrator\" rights to enable high speed scanning of NTFS hard drives and to access all system files and folders. Click on the \"Restart as Administrator\" button to enable Administrator rights."
+msgstr "WizTree ต้องการสิทธิ์ \"ผู้ดูแลระบบ\" เพื่อเปิดใช้งานการสแกนความเร็วสูงบนฮาร์ดไดรฟ์ NTFS และเพื่อเข้าถึงไฟล์และโฟลเดอร์ระบบทั้งหมด คลิกที่ปุ่ม \"รีสตาร์ทในฐานะผู้ดูแลระบบ\" เพื่อเปิดใช้งานสิทธิ์ผู้ดูแลระบบ"
+
+#: WizTreeMain.pas:4252
+msgid "Don't show this again"
+msgstr "อย่าแสดงสิ่งนี้อีก"
+
+#: WizTreeMain.pas:4254
+msgid "View Update"
+msgstr "ดูการอัปเดต"
+
+#: WizTreeMain.pas:4255
+msgid "Dismiss"
+msgstr "อนุญาตให้ออกไป"
+
+#: WizTreeMain.pas:4256
+msgid "Check for updates"
+msgstr "ตรวจสอบการอัปเดต"
+
+#: WizTreeMain.pas:4257
+msgid "Check for updates now"
+msgstr "ตรวจสอบการอัปเดตตอนนี้"
+
+#: WizTreeMain.pas:4259
+msgid "Select:"
+msgstr "เลือก:"
+
+#: WizTreeMain.pas:4261
+msgid "Cancel"
+msgstr "ยกเลิก"
+
+#: WizTreeMain.pas:4262
+msgid "Ready..."
+msgstr "พร้อม..."
+
+#: WizTreeMain.pas:4263
+msgid "Selection:"
+msgstr "การเลือก:"
+
+#: WizTreeMain.pas:4264
+msgid "Total Space:"
+msgstr "พื้นที่ทั้งหมด:"
+
+#: WizTreeMain.pas:4265
+msgid "Space Used:"
+msgstr "พื้นที่ที่ใช้:"
+
+#: WizTreeMain.pas:4266
+msgid "Space Free:"
+msgstr "พื้นที่ว่าง:"
+
+#: WizTreeMain.pas:4276
+msgid "Help us make WizTree better!"
+msgstr "ช่วยเราพัฒนา WizTree ให้ดียิ่งขึ้น!"
+
+#: WizTreeMain.pas:4278
+msgid "Tree View"
+msgstr "วิวต้นไม้"
+
+#: WizTreeMain.pas:4280
+msgid "Folder"
+msgstr "โฟลเดอร์"
+
+#: WizTreeMain.pas:4281
+msgid "Percent of Parent"
+msgstr "% ของผู้ปกครอง"
+
+#: WizTreeMain.pas:4282 WizTreeMain.pas:4307
+msgid "Size"
+msgstr "ขนาด"
+
+#: WizTreeMain.pas:4284 WizTreeMain.pas:4308
+msgid "Modified"
+msgstr "แก้ไขแล้ว"
+
+#: WizTreeMain.pas:4285 WizTreeMain.pas:4309
+msgid "Attributes"
+msgstr "คุณลักษณะ"
+
+#: WizTreeMain.pas:4287
+msgid "Items"
+msgstr "รายการ"
+
+#: WizTreeMain.pas:4288 WizTreeMain.pas:4310
+msgid "Allocated"
+msgstr "จัดสรร"
+
+#: WizTreeMain.pas:4290
+msgid "File View"
+msgstr "การดูไฟล์"
+
+#: WizTreeMain.pas:4292
+msgid "File Search Filter:"
+msgstr "ตัวกรองการค้นหาไฟล์:"
+
+#: WizTreeMain.pas:4293
+msgid "Clear"
+msgstr "ชัดเจน"
+
+#: WizTreeMain.pas:4294
+msgid "Match file name only"
+msgstr "จับคู่เฉพาะชื่อไฟล์เท่านั้น"
+
+#: WizTreeMain.pas:4295
+msgid "(Fast)"
+msgstr "(เร็ว)"
+
+#: WizTreeMain.pas:4296
+msgid "Match entire path"
+msgstr "ตรงกับเส้นทางทั้งหมด"
+
+#: WizTreeMain.pas:4297
+msgid "(Warning: can be slow!)"
+msgstr "(คำเตือน: อาจใช้เวลานาน!)"
+
+#: WizTreeMain.pas:4298
+msgid "Max files to display:"
+msgstr "จำนวนไฟล์สูงสุดที่จะแสดง:"
+
+#: WizTreeMain.pas:4300
+msgid "(Selecting ALL can be very slow!)"
+msgstr "(การเลือกทั้งหมดอาจใช้เวลานานมาก!)"
+
+#: WizTreeMain.pas:4301
+msgid "ALL"
+msgstr "ทั้งหมด"
+
+#: WizTreeMain.pas:4303
+msgid "Total Files:"
+msgstr "จำนวนไฟล์ทั้งหมด:"
+
+#: WizTreeMain.pas:4305
+msgid "File Name"
+msgstr "ชื่อไฟล์"
+
+#: WizTreeMain.pas:4306
+msgid "Percent of Drive"
+msgstr "เปอร์เซ็นต์ของไดรฟ์"
+
+#: WizTreeMain.pas:4312
+msgid "About"
+msgstr "เกี่ยวกับ"
+
+#: WizTreeMain.pas:4314
+msgid "If you use WizTree commercially or you'd just like to support the freeware community then please make a donation by clicking on the Donate button at the top right of the screen. Thank you! :)"
+msgstr "หากคุณใช้ WizTree ในเชิงพาณิชย์ หรือต้องการสนับสนุนชุมชนซอฟต์แวร์ฟรี โปรดบริจาคโดยคลิกที่ปุ่มบริจาคที่มุมบนขวาของหน้าจอ ขอบคุณครับ! :)"
+
+#: WizTreeMain.pas:4316
+msgid "What is WizTree?"
+msgstr "WizTree คืออะไร?"
+
+#: WizTreeMain.pas:4317
+msgid "WizTree is the world's fastest disk space analyzer. It scans your hard drive and shows you which files and folders are using the most disk space."
+msgstr "WizTree คือโปรแกรมวิเคราะห์พื้นที่ดิสก์ที่เร็วที่สุดในโลก มันจะสแกนฮาร์ดไดรฟ์ของคุณและแสดงให้คุณเห็นว่าไฟล์และโฟลเดอร์ใดใช้พื้นที่ดิสก์มากที่สุด"
+
+#: WizTreeMain.pas:4318
+msgid "It does this in the FASTEST way possible - you simply won't find any other application of this type that's quicker! Use the information WizTree provides to quickly locate and remove \"space hogs\" from your hard drive."
+msgstr "โปรแกรมนี้ทำงานด้วยวิธีที่เร็วที่สุดเท่าที่จะเป็นไปได้ คุณจะไม่พบโปรแกรมอื่นใดที่เร็วกว่านี้! ใช้ข้อมูลที่ WizTree ให้มาเพื่อค้นหาและลบ \"ไฟล์ที่กินพื้นที่มาก\" ออกจากฮาร์ดไดรฟ์ของคุณได้อย่างรวดเร็ว"
+
+#: WizTreeMain.pas:4320
+msgid "WARNING: Take care not to remove any files that are required for the correct operation of your PC!"
+msgstr "คำเตือน: โปรดระมัดระวังอย่าลบไฟล์ใดๆ ที่จำเป็นต่อการทำงานที่ถูกต้องของพีซีของคุณ!"
+
+#: WizTreeMain.pas:4322
+msgid "What makes WizTree so fast?"
+msgstr "อะไรทำให้ WizTree เร็วขนาดนี้?"
+
+#: WizTreeMain.pas:4324
+msgid "When scanning NTFS formatted hard drives (most modern hard drives use this format), WizTree reads the hard drive's Master File Table (MFT) directly from the disk."
+msgstr "เมื่อทำการสแกนฮาร์ดไดรฟ์ที่ฟอร์แมตด้วย NTFS (ฮาร์ดไดรฟ์สมัยใหม่ส่วนใหญ่ใช้รูปแบบนี้) WizTree จะอ่านตารางไฟล์หลัก (MFT) ของฮาร์ดไดรฟ์โดยตรงจากดิสก์"
+
+#: WizTreeMain.pas:4325
+msgid "The MFT is a special hidden file used by the NTFS file system to keep track of all files and folders on a hard drive. Scanning for files this way completely bypasses the operating system (Windows) and provides a huge performance boost."
+msgstr "MFT เป็นไฟล์พิเศษที่ซ่อนอยู่ ซึ่งระบบไฟล์ NTFS ใช้เพื่อติดตามไฟล์และโฟลเดอร์ทั้งหมดบนฮาร์ดไดรฟ์ การสแกนหาไฟล์ด้วยวิธีนี้จะข้ามขั้นตอนการทำงานของระบบปฏิบัติการ (Windows) ไปโดยสิ้นเชิง และช่วยเพิ่มประสิทธิภาพการทำงานได้อย่างมาก"
+
+#: WizTreeMain.pas:4327
+msgid "As of version 2.0, WizTree can now also scan non NTFS hard drives, network drives, USB drives, and individual directories."
+msgstr "ตั้งแต่เวอร์ชัน 2.0 เป็นต้นไป WizTree สามารถสแกนฮาร์ดไดรฟ์ที่ไม่ใช้ระบบไฟล์ NTFS, ไดรฟ์เครือข่าย, ไดรฟ์ USB และไดเร็กทอรีแต่ละรายการได้แล้ว"
+
+#: WizTreeMain.pas:4329
+msgid "Please visit the Antibody Software website for more great software, such as:"
+msgstr "โปรดเยี่ยมชมเว็บไซต์ Antibody Software เพื่อดูซอฟต์แวร์ที่ยอดเยี่ยมอื่นๆ เพิ่มเติม เช่น:"
+
+#: WizTreeMain.pas:4330 WizTreeMain.pas:4334
+msgid "(click for more information)"
+msgstr "(คลิกเพื่อดูข้อมูลเพิ่มเติม)"
+
+#: WizTreeMain.pas:4331
+msgid "A powerful yet easy to use web gallery downloading tool. It supports most of the popular image hosting sites (such as flickr, facebook, Google image search, imgur, deviantart etc.)."
+msgstr "เครื่องมือดาวน์โหลดภาพจากเว็บแกลเลอรีที่มีประสิทธิภาพแต่ใช้งานง่าย รองรับเว็บไซต์ฝากภาพยอดนิยมส่วนใหญ่ (เช่น flickr, facebook, Google image search, imgur, deviantart เป็นต้น)"
+
+#: WizTreeMain.pas:4332
+msgid "It doesn't require any complicated setup or project files - it just works."
+msgstr "ไม่ต้องตั้งค่าอะไรยุ่งยาก ไม่ต้องเตรียมไฟล์โปรเจ็กต์อะไรให้ยุ่งยาก มันใช้งานได้เลย"
+
+#: SelectLanguage.pas:56 supportercode.pas:239
+msgid "OK"
+msgstr "ตกลง"
+
+#: supportercode.pas:143
+msgid "Invalid Key - Please try again."
+msgstr "รหัสไม่ถูกต้อง - โปรดลองอีกครั้ง"
+
+#: supportercode.pas:144
+msgid "It is recommended that you copy and paste your supporter code."
+msgstr "ขอแนะนำให้คุณคัดลอกและวางรหัสผู้สนับสนุนของคุณ"
+
+#: supportercode.pas:145
+msgid "Only use digits 0 to 9 and letters A to F."
+msgstr "ใช้เฉพาะตัวเลข 0 ถึง 9 และตัวอักษร A ถึง F เท่านั้น"
+
+#: supportercode.pas:219 WizTreeMain.pas:6266
+msgid "Thank you for your support!"
+msgstr "ขอบคุณสำหรับการสนับสนุนของคุณ!"
+
+#: supportercode.pas:220
+msgid "WizTree will now restart."
+msgstr "โปรแกรม WizTree จะรีสตาร์ทแล้ว"
+
+#: supportercode.pas:241 WizTreeMain.pas:5286
+msgid "Enter Supporter Code"
+msgstr "ป้อนรหัสผู้สนับสนุน"
+
+#: supportercode.pas:242
+msgid "Supporter Code"
+msgstr "รหัสผู้สนับสนุน"
+
+#. warning dialog title
+#: uVistaTaskDialog.pas:228
+msgid "Warning"
+msgstr "คำเตือน"
+
+#. confirmation dialog title
+#: uVistaTaskDialog.pas:233
+msgid "Confirmation"
+msgstr "การยืนยัน"
+
+#. information dialog title
+#: uVistaTaskDialog.pas:243
+msgid "Information"
+msgstr "ข้อมูล"
+
+#: WizTreeMain.pas:1616
+msgid "(No Extension)"
+msgstr "(ไม่มีการต่อเวลา)"
+
+#: WizTreeMain.pas:5269
+msgid "File Type"
+msgstr "ประเภทไฟล์"
+
+#: WizTreeMain.pas:5272
+msgid "Percent"
+msgstr "เปอร์เซ็นต์"
+
+#: WizTreeMain.pas:5273
+msgid "Extension"
+msgstr "ส่วนขยาย"
+
+#: WizTreeMain.pas:5276
+msgid "MFT Dump"
+msgstr "MFT Dump"
+
+#: WizTreeMain.pas:5276
+msgid "All Files"
+msgstr "ไฟล์ทั้งหมด"
+
+#: WizTreeMain.pas:5277
+msgid "Show Treemap"
+msgstr "แสดงแผนผังต้นไม้ (Treemap)"
+
+#: WizTreeMain.pas:5278
+msgid "Show File Types"
+msgstr "แสดงประเภทไฟล์"
+
+#: WizTreeMain.pas:5279
+msgid "Reset tree expansion"
+msgstr "รีเซ็ตการขยายต้นไม้"
+
+#: WizTreeMain.pas:5281
+msgid "Select Parent"
+msgstr "เลือกผู้ปกครอง"
+
+#: WizTreeMain.pas:5282
+msgid "Reselect Child"
+msgstr "เลือกเด็กอีกครั้ง"
+
+#: WizTreeMain.pas:5283
+msgid "Help support WizTree development by making a donation"
+msgstr "ช่วยสนับสนุนการพัฒนา WizTree ด้วยการบริจาคเงิน"
+
+#: WizTreeMain.pas:5284
+msgid "(You can hide the Donate button by making a donation)"
+msgstr "(คุณสามารถซ่อนปุ่มบริจาคได้โดยการบริจาคเงิน)"
+
+#: WizTreeMain.pas:6883
+msgid "Show Allocated Size on Treemap"
+msgstr "แสดงขนาดที่จัดสรรไว้ใน Treemap"
+
+#: WizTreeMain.pas:6884
+msgid "Auto scan after making selection"
+msgstr "สแกนอัตโนมัติหลังจากเลือกแล้ว"
+
+#: WizTreeMain.pas:6886
+msgid "Zoom in Treemap"
+msgstr "ซูมเข้าใน Treemap"
+
+#: WizTreeMain.pas:6887
+msgid "Zoom out Treemap"
+msgstr "ซูมออก Treemap"
+
+#: exporttreemap.pas:57 WizTreeMain.pas:7193
+msgid "Save Treemap Image as .png file"
+msgstr "บันทึกภาพ Treemap เป็นไฟล์ .png"
+
+#: exporttreemap.pas:58
+msgid "Save"
+msgstr "บันทึก"
+
+#: exporttreemap.pas:60
+msgid "Width"
+msgstr "ความกว้าง"
+
+#: exporttreemap.pas:61
+msgid "Height"
+msgstr "ความสูง"
+
+#: exporttreemap.pas:62
+msgid "Shades of Gray (single color)"
+msgstr "เฉดสีเทา (สีเดียว)"
+
+#: WizTreeMain.pas:7191
+msgid "Show Free Space on Treemap"
+msgstr "แสดงพื้นที่ว่างบน Treemap"
+
+msgid "File already exists - overwrite?"
+msgstr "ไฟล์มีอยู่แล้ว - ต้องการเขียนทับหรือไม่?"
+
+#: WizTreeMain.pas:3002 WizTreeMain.pas:3217
+msgid "Generated by"
+msgstr "สร้างโดย"
+
+#: WizTreeMain.pas:3002 WizTreeMain.pas:3217
+msgid "You can hide this message by making a donation"
+msgstr "คุณสามารถซ่อนข้อความนี้ได้โดยการบริจาคเงิน"
+
+#: WizTreeMain.pas:4452
+msgid "MFT Dump cancelled..."
+msgstr "การยกเลิก MFT Dump สิ้นสุดลงแล้ว..."
+
+#: WizTreeMain.pas
+msgid "Export complete."
+msgstr "การส่งออกเสร็จสมบูรณ์"
+
+#: WizTreeMain.pas:7815
+msgid "Copy file and size info to clipboard"
+msgstr "คัดลอกข้อมูลไฟล์และขนาดไปยังคลิปบอร์ด"
+
+#: WizTreeMain.pas:7816
+msgid "Export to .CSV file"
+msgstr "ส่งออกเป็นไฟล์ .CSV"
+
+msgid "Colors"
+msgstr "สี"
+
+msgid "Default"
+msgstr "ค่าเริ่มต้น"
+
+msgid "Color Blind"
+msgstr "ตาบอดสี"
+
+msgid "CSV file"
+msgstr "ไฟล์ CSV"
+
+msgid "Select CSV file"
+msgstr "เลือกไฟล์ CSV"
+
+msgid "Failed to import CSV file"
+msgstr "ไม่สามารถนำเข้าไฟล์ CSV ได้"
+
+msgid "Color By"
+msgstr "ระบายสีโดย"
+
+msgid "Color"
+msgstr "สี"
+
+msgid "File Extension(s)"
+msgstr "นามสกุลไฟล์"
+
+msgid "Export File Types to CSV file"
+msgstr "ส่งออกประเภทไฟล์ไปยังไฟล์ CSV"
+
+msgid "Display TB values"
+msgstr "แสดงค่า TB"
+
+msgid "TB"
+msgstr "TB"
+
+msgid "UI Theme"
+msgstr "ธีม UI"
+
+msgid "Auto"
+msgstr "อัตโนมัติ"
+
+msgid "Light"
+msgstr "แสงสว่าง"
+
+msgid "Dark"
+msgstr "มืด"
+
+msgid "Sorry, your supporter code is only valid for versions of WizTree with version date"
+msgstr "ขออภัย รหัสสนับสนุนของคุณใช้ได้เฉพาะกับ WizTree เวอร์ชันที่มีวันที่เวอร์ชันที่ระบุไว้เท่านั้น"
+
+msgid "or earlier."
+msgstr "หรือก่อนหน้านั้น"
+
+msgid "This version of WizTree has version date"
+msgstr "WizTree เวอร์ชันนี้มีวันที่เวอร์ชัน"
+
+msgid "Please install an older version of WizTree with a suitable version date, or purchase a new supporter code."
+msgstr "โปรดติดตั้ง WizTree เวอร์ชันเก่าที่มีวันที่เวอร์ชันที่เหมาะสม หรือซื้อรหัสผู้สนับสนุนใหม่"
+
+msgid "Version Date:"
+msgstr "วันที่ของเวอร์ชัน:"
+
+msgid "Supporter license"
+msgstr "ใบอนุญาตผู้สนับสนุน"
+
+msgid "Enterprise license"
+msgstr "ใบอนุญาตระดับองค์กร"
+
+#: Displayed as X user license where is number
+msgid "user license"
+msgstr "ใบอนุญาตผู้ใช้"
+
+msgid "Upgrades until:"
+msgstr "อัปเกรดได้ถึง:"
+
+msgid "lifetime"
+msgstr "ตลอดชีวิต"
+
+msgid "Supporter code not valid for this version"
+msgstr "รหัสสนับสนุนใช้ไม่ได้กับเวอร์ชันนี้"
+
+msgid "Select Multiple"
+msgstr "เลือกหลายรายการ"
+
+msgid "Multiple"
+msgstr "หลายรายการ"
+
+msgid "Add Folder"
+msgstr "เพิ่มโฟลเดอร์"
+
+msgid "Remove Folder"
+msgstr "ลบโฟลเดอร์"
+
+msgid "is included within"
+msgstr "รวมอยู่ใน"
+
+msgid "They cannot both be selected."
+msgstr "ไม่สามารถเลือกทั้งสองอย่างได้"
+
+msgid "Select All"
+msgstr "เลือกทั้งหมด"
+
+msgid "Select None"
+msgstr "เลือก ไม่มี"
+
+msgid "Lifetime"
+msgstr "ตลอดชีวิต"
+
+msgid "Show Folder and File Names on Treemap"
+msgstr "แสดงชื่อโฟลเดอร์และไฟล์บนแผนผังต้นไม้"
+
+msgid "Filter Scan Results"
+msgstr "ผลการสแกนตัวกรอง"
+
+msgid "Include Filter:"
+msgstr "รวมตัวกรอง:"
+
+msgid "Exclude Filter:"
+msgstr "ตัวกรองการยกเว้น:"
+
+msgid "Apply Filter"
+msgstr "ใช้ตัวกรอง"
+
+msgid "Cut"
+msgstr "ตัด"
+
+msgid "Copy"
+msgstr "สำเนา"
+
+msgid "Reset Configuration to default values"
+msgstr "รีเซ็ตการตั้งค่าเป็นค่าเริ่มต้น"
+
+msgid "Tweaks"
+msgstr "การปรับแต่ง"
+
+msgid "Enable drag/drop"
+msgstr "เปิดใช้งานการลาก/วาง"
+
+msgid "Open file on double click"
+msgstr "เปิดไฟล์ด้วยการดับเบิ้ลคลิก"
+
+msgid "Monitor file system for changes"
+msgstr "ตรวจสอบการเปลี่ยนแปลงในระบบไฟล์อย่างสม่ำเสมอ"
+
+msgid "Show max modified date of all sub folders/files as folder's last modified date"
+msgstr "แสดงวันที่แก้ไขล่าสุดของโฟลเดอร์ย่อย/ไฟล์ทั้งหมดเป็นวันที่แก้ไขล่าสุดของโฟลเดอร์นั้นๆ"
+
+msgid "Use WizTree classic theme"
+msgstr "ใช้ธีมคลาสสิกของ WizTree"
+
+msgid "Show horizontal lines in grids"
+msgstr "แสดงเส้นแนวนอนในรูปแบบตาราง"
+
+msgid "Alternate row colors"
+msgstr "สลับสีแถว"
+
+msgid "Enable gradient colors in treemap"
+msgstr "เปิดใช้งานสีไล่ระดับในแผนภูมิ Treemap"
+
+msgid "Number of Decimal places to display"
+msgstr "จำนวนตำแหน่งทศนิยมที่จะแสดง"
+
+msgid "WizFile is an extremely rapid file finder application that uses methods similar to WizTree to rapidly index your hard drives. File search results are returned instantly as you type. WizFile provides a real time view of all files on your hard drives - any changes to the file search results will be updated in real time as they occur. It requires minimal CPU and RAM usage and has a negligible impact on the performance of your PC."
+msgstr "WizFile เป็นโปรแกรมค้นหาไฟล์ที่รวดเร็วมาก โดยใช้วิธีการคล้ายกับ WizTree ในการจัดทำดัชนีฮาร์ดไดรฟ์ของคุณอย่างรวดเร็ว ผลการค้นหาไฟล์จะแสดงขึ้นทันทีขณะที่คุณพิมพ์ WizFile แสดงภาพรวมของไฟล์ทั้งหมดในฮาร์ดไดรฟ์ของคุณแบบเรียลไทม์ การเปลี่ยนแปลงใดๆ ในผลการค้นหาไฟล์จะได้รับการอัปเดตแบบเรียลไทม์ทันทีที่เกิดขึ้น โปรแกรมนี้ใช้ทรัพยากร CPU และ RAM น้อยมาก และแทบไม่มีผลกระทบต่อประสิทธิภาพของพีซีของคุณเลย"
+
+msgid "Dup Count"
+msgstr "จำนวนซ้ำ"
+
+msgid "Dup Size"
+msgstr "ขนาดเท่าของจริง"
+
+msgid "Duplicate Files:"
+msgstr "ไฟล์ซ้ำ:"
+
+msgid "Duplicates only"
+msgstr "เฉพาะสำเนาเท่านั้น"
+
+msgid "Don't locate duplicates"
+msgstr "อย่าค้นหารายการที่ซ้ำกัน"
+
+msgid "Locate by Name, Size"
+msgstr "ค้นหาตามชื่อและขนาด"
+
+msgid "Locate by Name, Size, Date"
+msgstr "ค้นหาตามชื่อ ขนาด และวันที่"
+
+msgid "Path"
+msgstr "เส้นทาง"
+
+msgid "Scan MFT (if possible) when a folder is selected for analysis"
+msgstr "สแกน MFT (ถ้าเป็นไปได้) เมื่อเลือกโฟลเดอร์สำหรับการวิเคราะห์"
+
+msgid "Normally the MFT is only scanned when an entire drive is selected. This option can speed up the scanning of folders containing a large number of files, but can be slower for smaller folders."
+msgstr "โดยปกติแล้ว MFT จะทำการสแกนก็ต่อเมื่อเลือกไดรฟ์ทั้งหมดเท่านั้น ตัวเลือกนี้จะช่วยเร่งความเร็วในการสแกนโฟลเดอร์ที่มีไฟล์จำนวนมาก แต่จะช้าลงสำหรับโฟลเดอร์ขนาดเล็ก"
+
+msgid "Reserved Space:"
+msgstr "พื้นที่สำรอง:"
+
+msgid "Expand All"
+msgstr "ขยายทั้งหมด"
+
+msgid "File group minimum size (set to 0 to disable file grouping)"
+msgstr "ขนาดขั้นต่ำของกลุ่มไฟล์ (ตั้งค่าเป็น 0 เพื่อปิดใช้งานการจัดกลุ่มไฟล์)"
+
+msgid "Export"
+msgstr "ส่งออก"
+
+msgid "Export file name:"
+msgstr "ชื่อไฟล์ส่งออก:"
+
+msgid "Selection"
+msgstr "การคัดเลือก"
+
+msgid "Selected only"
+msgstr "เลือกเฉพาะ"
+
+msgid "Export drive size information"
+msgstr "ข้อมูลขนาดไดรฟ์ส่งออก"
+
+msgid "Export \"Last Accessed\" and \"Created\" dates"
+msgstr "ส่งออกวันที่ \"เข้าถึงครั้งล่าสุด\" และ \"สร้างครั้งล่าสุด\""
+
+msgid "Export total size and allocated size of folders (excluding sub folders)"
+msgstr "ส่งออกขนาดรวมและขนาดที่จัดสรรของโฟลเดอร์ (ไม่รวมโฟลเดอร์ย่อย)"
+
+msgid "Split file names into root, folder, filename and extension"
+msgstr "แยกชื่อไฟล์ออกเป็นส่วนๆ ได้แก่ ราก โฟลเดอร์ ชื่อไฟล์ และนามสกุล"
+
+msgid "Export percentage of parent value"
+msgstr "เปอร์เซ็นต์การส่งออกของมูลค่าหลัก"
+
+msgid "Max folder depth (0 = no limit):"
+msgstr "ความลึกสูงสุดของโฟลเดอร์ (0 = ไม่จำกัด):"
+
+msgid "Export Files"
+msgstr "ไฟล์ส่งออก"
+
+msgid "Export Folders"
+msgstr "ส่งออกโฟลเดอร์"
+
+msgid "Either one or both of \"Export Files\" and \"Export Folders\" must be selected for the export to be valid."
+msgstr "ต้องเลือก \"ส่งออกไฟล์\" หรือ \"ส่งออกโฟลเดอร์\" อย่างใดอย่างหนึ่งหรือทั้งสองอย่าง เพื่อให้การส่งออกมีผลสมบูรณ์"
+
+msgid "Export MFT record number"
+msgstr "หมายเลขบันทึกการส่งออก MFT"
+
+msgid "Rename"
+msgstr "เปลี่ยนชื่อ"
+
+msgid "Enable rename"
+msgstr "เปิดใช้งานการเปลี่ยนชื่อ"
+
+msgid "Show Header"
+msgstr "แสดงส่วนหัว"

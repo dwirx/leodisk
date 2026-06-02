@@ -9,6 +9,7 @@ mod storage;
 mod system;
 mod util;
 mod windows_metrics;
+mod wiztree;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,11 +21,17 @@ pub fn run() {
             system::get_system_snapshot,
             cleanup::scan_cleanup,
             cleanup::scan_deep_cleanup,
+            cleanup::start_cleanup_scan,
+            cleanup::get_active_cleanup_scan,
+            cleanup::cancel_cleanup_scan,
             cleanup::delete_cleanup_items,
+            cleanup::start_cleanup_delete,
+            cleanup::get_active_cleanup_delete,
             cleanup::open_scanned_location,
             cleanup::export_cleanup_report,
             cleanup::export_cleanup_metafile,
             cleanup::export_cleanup_detail,
+            cleanup::open_exported_cleanup_file,
             apps::list_installed_apps,
             apps::launch_uninstaller,
             apps::open_app_location,
@@ -38,7 +45,10 @@ pub fn run() {
             storage::open_storage_settings,
             disk_scan::get_active_disk_scan,
             disk_scan::start_disk_scan,
-            disk_scan::cancel_disk_scan
+            disk_scan::cancel_disk_scan,
+            wiztree::get_wiztree_status,
+            wiztree::verify_wiztree_status,
+            wiztree::install_wiztree_portable
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
