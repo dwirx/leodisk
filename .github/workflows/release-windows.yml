@@ -1,0 +1,48 @@
+name: Release Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "leodisk-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    name: Build and release Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build output
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Build and upload Windows release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: "leodisk-v__VERSION__"
+          releaseName: "LeoDisk v__VERSION__"
+          releaseBody: "Download the Windows installer from the assets below."
+          releaseDraft: true
+          prerelease: false
+          tauriScript: "bun run tauri"
